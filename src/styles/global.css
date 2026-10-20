@@ -89,3 +89,4 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 
 #file:focus-visible + #file-btn { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
 @media (max-width: 420px) { .stat dd { font-size: .875rem; } }
+.bar-btn { width:auto; flex:none; min-height:48px; }

@@ -52,6 +52,49 @@ assert.match(t.layout({ ...base, overlap: NaN }).error, /Enter a number/);
 assert.match(t.layout({ ...base, margin: -1 }).error, /negative/);
 assert.doesNotMatch(t.layout({ ...base, mode: 'width', value: 1e15 }).error, /\d{6}/);
 
+// Fit and Fill. A landscape 3:2 picture on a 24 x 36 portrait poster
+const fillOpts = { ...base, imgW: 3000, imgH: 2000, fit: 'fill', fillW: 24, fillH: 36 };
+{
+  const c = t.cropRect(3000, 2000, 24, 36);
+  near(c.sh, 2000); near(c.sw, 2000 * (24 / 36)); near(c.sx, (3000 - c.sw) / 2); near(c.sy, 0);
+  assert.equal(c.cutPct, 56); // 1 - (2/3 * 2000) / 3000
+  // Taller picture on a wide poster: the width stays, the height is cut
+  const w = t.cropRect(2000, 3000, 36, 24);
+  near(w.sw, 2000); near(w.sh, 2000 * (24 / 36)); near(w.sx, 0); near(w.sy, (3000 - w.sh) / 2);
+  // Same shape: nothing is cut
+  const same = t.cropRect(2000, 3000, 24, 36);
+  assert.equal(same.cutPct, 0); near(same.sw, 2000); near(same.sh, 3000);
+  // Position runs from one edge to the other and never leaves the picture
+  near(t.cropRect(3000, 2000, 24, 36, 0, 0).sx, 0);
+  near(t.cropRect(3000, 2000, 24, 36, 1, 0).sx + t.cropRect(3000, 2000, 24, 36, 1, 0).sw, 3000);
+  near(t.cropRect(3000, 2000, 24, 36, 9, -4).sx, 3000 - 2000 * (24 / 36));
+  near(t.cropRect(3000, 2000, 24, 36, NaN, NaN).sx, (3000 - 2000 * (24 / 36)) / 2);
+  // The crop never exceeds the picture, for odd shapes too
+  for (const [iw, ih, pw, ph] of [[1, 1, 1, 7], [5000, 10, 3, 3], [10, 5000, 90, 1], [4000, 3000, 4, 3]]) {
+    const r = t.cropRect(iw, ih, pw, ph, 1, 1);
+    assert.ok(r.sx >= -1e-9 && r.sy >= -1e-9 && r.sx + r.sw <= iw + 1e-9 && r.sy + r.sh <= ih + 1e-9);
+    near(r.sw / r.sh, pw / ph, 1e-6);
+  }
+  // The exact poster size comes out, whatever the picture shape
+  let F = t.layout(fillOpts);
+  assert.ok(F.ok && F.fill);
+  near(F.posterW, 24); near(F.posterH, 36);
+  assert.equal(F.cols, 4); assert.equal(F.rows, 4); assert.equal(F.sheets, 16);
+  // dpi counts only the kept pixels: 1333 px across 24 in
+  near(F.dpi, (2000 * 24 / 36) / 24, 0.001);
+  // Fit keeps the whole picture and reports no cut
+  const fitL = t.layout({ ...fillOpts, fit: 'fit', mode: 'width', value: 24 });
+  near(fitL.posterH, 16); assert.equal(fitL.crop.cutPct, 0); near(fitL.dpi, 125);
+  // Centimeters: 60.96 x 91.44 cm is 24 x 36 in
+  F = t.layout({ ...fillOpts, unit: 'cm', fillW: 60.96, fillH: 91.44, margin: 0.635, overlap: 1.27 });
+  near(F.posterW, 24); near(F.posterH, 36); assert.equal(F.sheets, 16);
+  // Fill needs both sizes
+  assert.equal(t.layout({ ...fillOpts, fillH: 0 }).ok, false);
+  assert.equal(t.layout({ ...fillOpts, fillW: '' }).ok, false);
+  // The crop position moves the window
+  assert.ok(t.layout({ ...fillOpts, fx: 1 }).crop.sx > t.layout({ ...fillOpts, fx: 0 }).crop.sx);
+}
+
 // Labels: row letter, column number
 assert.equal(t.tileLabel(0, 0), 'A1');
 assert.equal(t.tileLabel(2, 1), 'B3');
@@ -173,6 +216,22 @@ assert.equal(t.layout({ ...base, imgW: 8, imgH: 1, orientation: 'landscape', mod
     assert.ok(c.preset.paper in t.PAPER, c.slug);
     for (const r of c.related) assert.ok(cases.some((x) => x.slug === r), `${c.slug} -> ${r}`);
     assert.ok(!/[—–]/.test(JSON.stringify(c)), `${c.slug} has a dash`);
+  }
+}
+// Every guide page: the sheet count in its text is the count the tool shows with the page's own sample picture.
+{
+  const { cases } = await import('../src/data/cases.ts');
+  const words = { 4: 'four', 9: 'nine' };
+  for (const c of cases) {
+    const L = t.presetLayout(c.preset);
+    assert.ok(L.ok, c.slug);
+    assert.equal(L.sheets, c.sheets, `${c.slug}: tool shows ${L.sheets} sheets, page says ${c.sheets}`);
+    const text = (c.description + ' ' + c.intro.join(' ')).toLowerCase();
+    assert.ok(text.includes(String(c.sheets)) || (words[c.sheets] && text.includes(words[c.sheets])), `${c.slug}: text never says ${c.sheets} sheets`);
+    if (c.preset.fit === 'fill') {
+      assert.equal(L.crop.cutPct, 0, `${c.slug}: the sample should need no crop`);
+      near(L.posterW, c.preset.w); near(L.posterH, c.preset.h);
+    }
   }
 }
 console.log('Landing page checks passed');

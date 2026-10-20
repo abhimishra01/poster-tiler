@@ -42,18 +42,33 @@ export function describeQuality(dpi) {
   return { level: 'low', text: 'blurry, use a larger image or a smaller poster' };
 }
 
+// The part of the picture that stays when it fills a poster of another shape.
+// fx and fy (0 to 1) place the kept window on the side that has spare picture. 0.5 is the center.
+export function cropRect(imgW, imgH, posterW, posterH, fx = 0.5, fy = 0.5) {
+  const clamp = (v) => Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0.5));
+  const want = posterW / posterH;
+  let sw = imgW, sh = imgH;
+  if (imgW / imgH > want) sw = imgH * want; else sh = imgW / want;
+  const sx = (imgW - sw) * clamp(fx);
+  const sy = (imgH - sh) * clamp(fy);
+  return { sx, sy, sw, sh, cutPct: Math.round((1 - (sw * sh) / (imgW * imgH)) * 100) };
+}
+
 /**
  * opts: imgW, imgH (pixels), paper, orientation, mode ('across'|'width'|'height'),
  *       value (pages, or a length in `unit`), unit ('in'|'cm'), margin, overlap (in `unit`)
+ *       fit ('fit' keeps the whole picture, 'fill' crops it to fillW x fillH in `unit`), fx, fy (crop position)
  */
 export function layout(opts) {
   const { imgW, imgH, paper = 'letter', orientation = 'portrait', mode = 'across', unit = 'in' } = opts;
+  const fill = opts.fit === 'fill';
   const value = Number(opts.value);
   const margin = toInches(Number(opts.margin), unit);
   const overlap = toInches(Number(opts.overlap), unit);
   const fail = (error) => ({ ok: false, error });
   if (!(imgW > 0 && imgH > 0)) return fail('Choose an image first.');
-  if (!(value > 0)) return fail(mode === 'across' ? 'Enter how many pages across.' : 'Enter a poster size.');
+  if (fill && !(Number(opts.fillW) > 0 && Number(opts.fillH) > 0)) return fail('Enter a poster width and a poster height.');
+  if (!fill && !(value > 0)) return fail(mode === 'across' ? 'Enter how many pages across.' : 'Enter a poster size.');
   if (Number.isNaN(margin) || Number.isNaN(overlap)) return fail('Enter a number for the margin and the overlap.');
   if (margin < 0 || overlap < 0) return fail('Margin and overlap cannot be negative.');
   const page = pageSize(paper, orientation);
@@ -65,7 +80,10 @@ export function layout(opts) {
   if (stepX < 0.5 || stepY < 0.5) return fail('The overlap is too large for this paper.');
 
   let posterW, posterH;
-  if (mode === 'across') {
+  if (fill) {
+    posterW = toInches(Number(opts.fillW), unit);
+    posterH = toInches(Number(opts.fillH), unit);
+  } else if (mode === 'across') {
     const cols = Math.round(value);
     if (cols < 1) return fail('Enter at least 1 page across.');
     posterW = printW + (cols - 1) * stepX;
@@ -83,9 +101,10 @@ export function layout(opts) {
 
   const lastColFill = cols > 1 ? (posterW - (cols - 1) * stepX) / printW : 1;
   const lastRowFill = rows > 1 ? (posterH - (rows - 1) * stepY) / printH : 1;
-  const dpi = imgW / posterW;
+  const crop = fill ? cropRect(imgW, imgH, posterW, posterH, opts.fx, opts.fy) : { sx: 0, sy: 0, sw: imgW, sh: imgH, cutPct: 0 };
+  const dpi = crop.sw / posterW;
   return {
-    ok: true, cols, rows, sheets: cols * rows,
+    ok: true, fill, crop, cols, rows, sheets: cols * rows,
     page, margin, overlap, printW, printH, stepX, stepY,
     posterW, posterH, dpi, quality: describeQuality(dpi),
     lastColFill, lastRowFill,
@@ -120,4 +139,12 @@ export function wasteTip(L, unit = 'in') {
     });
   }
   return tips;
+}
+
+// The layout a guide page opens with: its sample picture (shape = [w, h]) at the preset, default margin and overlap.
+export function presetLayout(p, margin = 0.25, overlap = 0.5) {
+  return layout({
+    imgW: p.shape[0] * 1000, imgH: p.shape[1] * 1000, paper: p.paper, orientation: p.orient, mode: p.mode, value: p.value, unit: p.unit, margin, overlap,
+    ...(p.fit === 'fill' ? { fit: 'fill', fillW: p.w, fillH: p.h } : {}),
+  });
 }

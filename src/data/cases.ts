@@ -1,6 +1,8 @@
 // Landing pages for common poster jobs. Each one starts the tool on its own preset and has its own text.
 // The tables on each page are computed from the same math as the tool (src/lib/tile.js), at build time.
-export type Preset = { paper: string; orient: 'portrait' | 'landscape'; mode: 'across' | 'width' | 'height'; value: number; unit: 'in' };
+// shape is the width and height of the sample picture, so the sample has the same shape as the page's poster.
+// fit 'fill' crops the picture to the exact poster size w x h (inches).
+export type Preset = { paper: string; orient: 'portrait' | 'landscape'; mode: 'across' | 'width' | 'height'; value: number; unit: 'in'; shape: [number, number]; fit?: 'fill'; w?: number; h?: number };
 export type Table =
   | { kind: 'sizes'; caption: string; sizes: { w: number; h: number }[]; papers: [string, string][] }
   | { kind: 'across'; caption: string; pages: number; shapes: [number, number, string][] };
@@ -10,6 +12,7 @@ export type Case = {
   h1: string;
   description: string;
   preset: Preset;
+  sheets: number;          // the sheet count the page text promises for the preset; scripts/test.mjs checks it against the math
   intro: string[];
   table: Table;
   sections: { h: string; p?: string[]; ul?: string[] }[];
@@ -23,7 +26,8 @@ export const cases: Case[] = [
     title: 'Print a 24x36 Poster on Letter Paper',
     h1: 'Print a 24 x 36 inch poster on Letter paper',
     description: 'A 24 x 36 inch poster takes 16 Letter sheets in portrait or 15 in landscape. Split your image into a PDF, free, with no watermark.',
-    preset: { paper: 'letter', orient: 'portrait', mode: 'width', value: 24, unit: 'in' },
+    sheets: 16,
+    preset: { paper: 'letter', orient: 'portrait', mode: 'width', value: 24, unit: 'in', shape: [2, 3], fit: 'fill', w: 24, h: 36 },
     intro: [
       '24 x 36 inches is the standard movie poster size, and it is the size most people mean when they ask for a "big poster". A home printer cannot print it in one piece. You print it as tiles on Letter paper and join the sheets.',
       'With a 0.25 inch printer margin and a 0.5 inch glue overlap, a 24 x 36 inch poster takes 16 Letter sheets in portrait (4 across, 4 down) or 15 sheets in landscape (3 across, 5 down). The tool below is already set to a 24 inch wide poster on portrait Letter. Add your image and it fills in the rest.',
@@ -52,7 +56,8 @@ export const cases: Case[] = [
     title: 'Print an 18x24 Poster on Letter Paper',
     h1: 'Print an 18 x 24 inch poster on Letter paper',
     description: 'An 18 x 24 inch poster takes 9 Letter sheets in portrait or 8 in landscape. Free PDF tiler with overlap, cut marks and page labels.',
-    preset: { paper: 'letter', orient: 'portrait', mode: 'width', value: 18, unit: 'in' },
+    sheets: 9,
+    preset: { paper: 'letter', orient: 'portrait', mode: 'width', value: 18, unit: 'in', shape: [3, 4], fit: 'fill', w: 18, h: 24 },
     intro: [
       '18 x 24 inches is a common size for school projects, science fair boards and wall prints. It is also the largest size that stays easy to handle on a table. You can lay it out and glue it in one sitting.',
       'On Letter paper with a 0.25 inch margin and a 0.5 inch overlap, the poster takes 9 sheets in portrait (3 across, 3 down). In landscape it takes 8 sheets (2 across, 4 down). The tool is set to 18 inches wide. Add your picture to see the grid.',
@@ -80,7 +85,8 @@ export const cases: Case[] = [
     title: 'Print a 36x48 Poster on Letter Paper',
     h1: 'Print a 36 x 48 inch poster on Letter paper',
     description: 'A 36 x 48 inch poster takes 25 Letter sheets in portrait or 28 in landscape. Plan the sheets, the glue and the wall space first.',
-    preset: { paper: 'letter', orient: 'portrait', mode: 'width', value: 36, unit: 'in' },
+    sheets: 25,
+    preset: { paper: 'letter', orient: 'portrait', mode: 'width', value: 36, unit: 'in', shape: [3, 4], fit: 'fill', w: 36, h: 48 },
     intro: [
       '36 x 48 inches is a large poster, about the width of a doorway. On Letter paper with a 0.25 inch margin and a 0.5 inch overlap, it takes 25 sheets in portrait (5 x 5). Landscape needs more, 28 sheets (4 x 7), so portrait is the better choice here.',
       'This is the point where paper size matters. If you can print on Tabloid (11 x 17 inch), the same poster needs 12 sheets in portrait (4 across, 3 down). The tool is set to 36 inches wide. Change the paper to compare.',
@@ -109,7 +115,8 @@ export const cases: Case[] = [
     title: 'Print a 24x36 Poster on A4 Paper',
     h1: 'Print a 24 x 36 inch poster on A4 paper',
     description: 'A 24 x 36 inch (61 x 91 cm) poster takes 16 A4 sheets in portrait or 15 in landscape. Free PDF tiler, no watermark.',
-    preset: { paper: 'a4', orient: 'portrait', mode: 'width', value: 24, unit: 'in' },
+    sheets: 16,
+    preset: { paper: 'a4', orient: 'portrait', mode: 'width', value: 24, unit: 'in', shape: [2, 3], fit: 'fill', w: 24, h: 36 },
     intro: [
       'A 24 x 36 inch poster is about 61 x 91 cm. On A4 paper (210 x 297 mm) with a 0.25 inch (6 mm) margin and a 0.5 inch (13 mm) overlap, it takes 16 sheets in portrait (4 across, 4 down) or 15 in landscape (3 across, 5 down).',
       'The tool opens set to A4 and a 24 inch wide poster. Switch the units to centimeters if you prefer to type 61 cm.',
@@ -137,7 +144,8 @@ export const cases: Case[] = [
     title: 'A4 Poster on 3 x 3 Pages (9 Sheets)',
     h1: 'Make an A4 poster from 3 x 3 pages',
     description: 'Nine A4 sheets make a poster about 22 inches (57 cm) wide. See the size for your picture shape and download a free PDF.',
-    preset: { paper: 'a4', orient: 'portrait', mode: 'across', value: 3, unit: 'in' },
+    sheets: 9,
+    preset: { paper: 'a4', orient: 'portrait', mode: 'across', value: 3, unit: 'in', shape: [4, 5] },
     intro: [
       'Nine A4 sheets in a 3 x 3 grid are the most popular home poster. It is big enough to fill a wall, and small enough to glue on a kitchen table. With a 6 mm margin and a 13 mm overlap, three A4 sheets side by side cover 22.3 inches (57 cm).',
       'The height depends on your picture. A 3:4 portrait photo fills 3 x 3 sheets exactly, giving a poster of 22.3 x 29.7 inches (57 x 75 cm). A square picture makes 22.3 x 22.3 inches and also uses 9 sheets. The tool is set to 3 pages across on A4.',
@@ -145,7 +153,7 @@ export const cases: Case[] = [
     table: { kind: 'across', caption: 'Poster size with 3 pages across', pages: 3, shapes: [[1, 1, 'Square'], [3, 4, '3:4 portrait'], [2, 3, '2:3 portrait'], [3, 2, '3:2 landscape']] },
     sections: [
       { h: 'Choosing the shape of your picture', p: [
-        'The tool keeps the shape of your image and does not crop. The number of pages down comes from the shape. If you want exactly 3 x 3, crop your picture to a 3:4 portrait in a photo app first. A tall 2:3 picture makes 3 x 4, which is 12 sheets.' ] },
+        'In Fit mode the tool keeps the shape of your image and does not crop. The number of pages down comes from the shape. If you want exactly 3 x 3, crop your picture to a 3:4 portrait in a photo app first. A tall 2:3 picture makes 3 x 4, which is 12 sheets.' ] },
       { h: 'Margins and overlap on A4', p: [
         'Most home printers lose about 6 mm at each edge. Keep the margin at 0.25 inch unless your printer manual says it can print closer. If you set the margin to 0, borderless printing can cut off part of the picture or shift it.' ] },
       { h: 'Finishing', ul: [
@@ -165,7 +173,8 @@ export const cases: Case[] = [
     title: 'Print a Poster on 4 Pages (2 x 2)',
     h1: 'Print a poster on 4 pages (2 x 2)',
     description: 'Four Letter sheets make a poster of about 15.5 x 20 inches. Quick, cheap and easy to glue. Free tiler with no watermark.',
-    preset: { paper: 'letter', orient: 'portrait', mode: 'across', value: 2, unit: 'in' },
+    sheets: 4,
+    preset: { paper: 'letter', orient: 'portrait', mode: 'across', value: 2, unit: 'in', shape: [4, 5] },
     intro: [
       'A 2 x 2 poster is the easiest tiled poster to make. It takes four sheets, one seam each way, and about ten minutes. With a 0.25 inch margin and a 0.5 inch overlap, two Letter sheets across cover 15.5 inches.',
       'A 4:5 picture makes a poster of 15.5 x 19.4 inches on exactly 4 sheets. A 3:4 picture is a little taller (15.5 x 20.7 inches) and needs 6 sheets. The tool is set to 2 pages across on Letter.',
@@ -193,7 +202,8 @@ export const cases: Case[] = [
     title: 'Print a Poster on 9 Pages (3 x 3)',
     h1: 'Print a poster on 9 pages (3 x 3)',
     description: 'Nine Letter sheets make a poster about 23 inches wide. See the size for your picture and get a free PDF with cut marks.',
-    preset: { paper: 'letter', orient: 'portrait', mode: 'across', value: 3, unit: 'in' },
+    sheets: 9,
+    preset: { paper: 'letter', orient: 'portrait', mode: 'across', value: 3, unit: 'in', shape: [4, 5] },
     intro: [
       'A 3 x 3 grid uses nine sheets and gives you a poster you can see from across a room. With Letter paper, a 0.25 inch margin and a 0.5 inch overlap, three sheets across cover 23 inches.',
       'Height depends on your picture. A square picture makes 23 x 23 inches and uses 9 sheets. A 3:4 picture makes 23 x 30.7 inches and takes 12 Letter sheets (3 x 4), or 9 sheets on Legal paper. The tool is set to 3 pages across.',
@@ -221,7 +231,8 @@ export const cases: Case[] = [
     title: 'Print a Banner on Multiple Pages',
     h1: 'Print a banner on multiple pages',
     description: 'Make a long banner from Letter or A4 sheets in one row. Set the height to one page and the tool builds the strip. Free, private, no watermark.',
-    preset: { paper: 'letter', orient: 'landscape', mode: 'height', value: 8, unit: 'in' },
+    sheets: 5,
+    preset: { paper: 'letter', orient: 'landscape', mode: 'height', value: 8, unit: 'in', shape: [6, 1] },
     intro: [
       'A banner is a poster that is one page tall. Use it for birthdays, welcome signs, team names and classroom headers. You print one sheet for each section and join them in a row.',
       'On landscape Letter paper with a 0.25 inch margin, one page shows 8 inches of height. A 48 x 8 inch banner takes 5 sheets, and a 36 x 8 inch banner takes 4. The tool is set to a height of 8 inches on landscape Letter. Add a wide picture and it builds a single row.',
@@ -240,7 +251,7 @@ export const cases: Case[] = [
     faq: [
       { q: 'How do I get one row of pages?', a: 'Choose the Height setting and enter a value no taller than one page, for example 8 inches on landscape Letter. The tool then builds one row.' },
       { q: 'How many sheets for a 6 foot banner?', a: 'A 72 x 8 inch banner takes 8 landscape Letter sheets with a 0.5 inch overlap. The preview shows the exact count for your picture shape.' },
-      { q: 'Should the picture be wide?', a: 'Yes. The tool does not crop. A square picture at 8 inches tall makes a banner only 8 inches wide.' },
+      { q: 'Should the picture be wide?', a: 'Yes. In Fit mode the tool does not crop. A square picture at 8 inches tall makes a banner only 8 inches wide.' },
     ],
     related: ['classroom-bulletin-board-poster', 'large-map-on-multiple-pages', 'poster-on-4-pages-2x2'],
   },
@@ -249,10 +260,11 @@ export const cases: Case[] = [
     title: 'Print a Classroom Bulletin Board Poster',
     h1: 'Print a classroom bulletin board poster',
     description: 'Enlarge a drawing, chart or border to fit a bulletin board using Letter or A4 sheets. Free, private and without a watermark.',
-    preset: { paper: 'letter', orient: 'portrait', mode: 'width', value: 36, unit: 'in' },
+    sheets: 15,
+    preset: { paper: 'letter', orient: 'portrait', mode: 'width', value: 36, unit: 'in', shape: [3, 2], fit: 'fill', w: 36, h: 24 },
     intro: [
       'Teachers often need a big picture for a bulletin board: a map of the world, a number line, a seasonal tree or a character from a book. School printers handle Letter or A4 sheets. This tool splits a picture over as many sheets as you need.',
-      'A common bulletin board is 36 x 48 inches, or 3 x 4 feet. A 36 inch wide picture takes 5 sheets across on Letter paper. A 24 inch wide picture takes 4. The tool is set to 36 inches wide. Change the width to match your board.',
+      'A common bulletin board is 36 x 48 inches, or 3 x 4 feet. A 36 inch wide picture takes 5 sheets across on Letter paper. A 24 inch wide picture takes 4. A 36 x 24 inch piece takes 15 sheets in all. The tool is set to 36 inches wide. Change the width to match your board.',
     ],
     table: { kind: 'sizes', caption: 'Sheets for common bulletin board pieces', sizes: [{ w: 24, h: 18 }, { w: 36, h: 24 }, { w: 36, h: 48 }, { w: 48, h: 36 }], papers: [['letter', 'Letter, portrait'], ['tabloid', 'Tabloid, portrait']] },
     sections: [
@@ -277,7 +289,8 @@ export const cases: Case[] = [
     title: 'Print a Large Map on Multiple Pages',
     h1: 'Print a large map on multiple pages',
     description: 'Print a wall map, a floor plan or a game map across many sheets. Overlap and labels help you line up fine details. Free and private.',
-    preset: { paper: 'letter', orient: 'landscape', mode: 'width', value: 36, unit: 'in' },
+    sheets: 16,
+    preset: { paper: 'letter', orient: 'landscape', mode: 'width', value: 36, unit: 'in', shape: [3, 2], fit: 'fill', w: 36, h: 24 },
     intro: [
       'Maps have thin lines and small text, so seams matter more than on a photo. A wall map, a floor plan, a battle map for a tabletop game or a trail map for a group trip all work better on one big sheet. You can build one from Letter or A4 pages.',
       'A 36 x 24 inch map takes 16 landscape Letter sheets (4 x 4), or 15 portrait sheets (5 x 3). On Tabloid paper it takes 9 in landscape (3 x 3). The tool is set to 36 inches wide on landscape Letter.',

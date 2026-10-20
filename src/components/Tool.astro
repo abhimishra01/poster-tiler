@@ -16,7 +16,7 @@ const { preset = null } = Astro.props;
   </div>
 
   <!-- Preview -->
-  <div class="rounded-2xl border border-line bg-card p-3 sm:p-4 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:sticky lg:top-20 flex flex-col gap-3 max-lg:pb-[72px]" id="drop">
+  <div class="rounded-2xl border border-line bg-card p-3 sm:p-4 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:sticky lg:top-20 flex flex-col gap-3 " id="drop">
     <div id="preview" class="relative h-[19rem] overflow-hidden rounded-xl border border-line bg-paper sm:h-[30rem] lg:order-3 lg:h-[24rem]" role="img" aria-label="Preview of the poster split into pages" aria-describedby="summary">
       <div id="preview-inner" class="absolute inset-0 p-2"></div>
     </div>
@@ -26,6 +26,10 @@ const { preset = null } = Astro.props;
       <div class="stat"><dt>Poster size</dt><dd id="st-size">&nbsp;</dd></div>
       <div class="stat"><dt>Print quality</dt><dd id="st-quality">&nbsp;</dd></div>
     </dl>
+    <div class="lg:hidden">
+      <button type="button" class="btn-ghost test-btn" disabled>Print a test page first (A1 only)</button>
+      <p role="status" class="dl-status mt-2 text-sm font-semibold text-ink">Print at 100% (Actual size). Do not choose Fit to page.</p>
+    </div>
     <div class="hidden lg:order-2 lg:block">
       <button type="button" class="btn-primary dl-btn" disabled>Download PDF</button>
       <button type="button" class="btn-ghost test-btn mt-2" disabled>Print a test page first (A1 only)</button>
@@ -59,18 +63,46 @@ const { preset = null } = Astro.props;
     <div>
       <p class="field-label">3. Poster size</p>
       <fieldset class="seg">
-        <legend class="sr-only">Set the poster size by</legend>
-        <label><input type="radio" name="mode" value="across" checked /><span>Across</span></label>
-        <label><input type="radio" name="mode" value="width" /><span>Width</span></label>
-        <label><input type="radio" name="mode" value="height" /><span>Height</span></label>
+        <legend class="sr-only">How the picture fills the poster</legend>
+        <label><input type="radio" name="fit" value="fit" checked /><span>Fit</span></label>
+        <label><input type="radio" name="fit" value="fill" /><span>Fill</span></label>
       </fieldset>
-      <label for="size" class="field-label mt-3" id="size-label">Pages across</label>
-      <div class="flex gap-2">
-        <button type="button" class="step-btn" id="size-minus" aria-label="Decrease">&minus;</button>
-        <input id="size" class="field text-center font-semibold tabular-nums" type="number" inputmode="decimal" min="1" step="1" value="3" />
-        <button type="button" class="step-btn" id="size-plus" aria-label="Increase">+</button>
+      <p id="fit-note" class="mt-1 text-xs text-muted">Fit shows the whole picture. The poster may have white at the edges.</p>
+
+      <div id="fit-fields" class="mt-3">
+        <fieldset class="seg">
+          <legend class="sr-only">Set the poster size by</legend>
+          <label><input type="radio" name="mode" value="across" checked /><span>Across</span></label>
+          <label><input type="radio" name="mode" value="width" /><span>Width</span></label>
+          <label><input type="radio" name="mode" value="height" /><span>Height</span></label>
+        </fieldset>
+        <label for="size" class="field-label mt-3" id="size-label">Pages across</label>
+        <div class="flex gap-2">
+          <button type="button" class="step-btn" id="size-minus" aria-label="Decrease">&minus;</button>
+          <input id="size" class="field text-center font-semibold tabular-nums" type="number" inputmode="decimal" min="1" step="1" value="3" />
+          <button type="button" class="step-btn" id="size-plus" aria-label="Increase">+</button>
+        </div>
       </div>
-      <fieldset class="seg mt-2">
+
+      <div id="fill-fields" class="mt-3" hidden>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="fill-w" class="field-label">Width (<span class="unit-name">in</span>)</label>
+            <input id="fill-w" class="field tabular-nums" type="number" inputmode="decimal" min="1" step="1" />
+          </div>
+          <div>
+            <label for="fill-h" class="field-label">Height (<span class="unit-name">in</span>)</label>
+            <input id="fill-h" class="field tabular-nums" type="number" inputmode="decimal" min="1" step="1" />
+          </div>
+        </div>
+        <p class="field-label mt-3" id="crop-h">What stays in the poster</p>
+        <div id="crop-box" class="mt-1 flex justify-center rounded-xl border border-line bg-paper p-2">
+          <svg id="crop-svg" class="block max-h-44 w-full touch-none cursor-grab select-none" tabindex="0" role="group" aria-labelledby="crop-h" aria-describedby="crop-note"></svg>
+        </div>
+        <p id="crop-note" class="mt-1 text-xs text-muted" aria-live="polite"></p>
+      </div>
+
+      <fieldset class="seg mt-3">
         <legend class="sr-only">Units</legend>
         <label><input type="radio" name="unit" value="in" checked /><span>Inches</span></label>
         <label><input type="radio" name="unit" value="cm" /><span>Centimeters</span></label>
@@ -96,17 +128,19 @@ const { preset = null } = Astro.props;
     </div>
   </div>
 
-  <!-- Download bar on phones. It stays at the bottom of the screen while you change settings. -->
-  <div class="sticky bottom-2 z-10 rounded-2xl border border-line bg-card p-3 shadow-lg lg:hidden">
-    <button type="button" class="btn-primary dl-btn" disabled>Download PDF</button>
-    <button type="button" class="btn-ghost test-btn mt-2" disabled>Print a test page first (A1 only)</button>
-    <p role="status" class="dl-status mt-2 text-xs font-semibold text-ink">Print at 100% (Actual size). Do not choose Fit to page.</p>
+  <!-- Download bar on phones: one row. It stays at the bottom of the screen while you change settings. -->
+  <div class="sticky bottom-2 z-10 flex h-16 items-center gap-3 rounded-2xl border border-line bg-card px-3 shadow-lg lg:hidden">
+    <div class="min-w-0 flex-1 leading-tight" aria-live="polite">
+      <p id="bar-sheets" class="truncate text-base font-extrabold tabular-nums">&nbsp;</p>
+      <p id="bar-size" class="truncate text-xs text-muted tabular-nums">&nbsp;</p>
+    </div>
+    <button type="button" class="btn-primary dl-btn bar-btn" disabled>Download</button>
   </div>
   <noscript><p class="rounded-xl border border-line bg-card p-4">This tool needs JavaScript. Turn it on to split your image into pages.</p></noscript>
 </section>
 
 <script>
-  import { layout, wasteTip, showLen, toInches, tileLabel, tileOrigin } from '../lib/tile.js';
+  import { layout, wasteTip, showLen, toInches, tileLabel, tileOrigin, cropRect } from '../lib/tile.js';
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
   const all = (sel: string) => Array.from(document.querySelectorAll<HTMLElement>(sel));
@@ -125,10 +159,15 @@ const { preset = null } = Astro.props;
   let marginIn = 0.25;
   let overlapIn = 0.5;
   let unit: 'in' | 'cm' = 'in';
+  // Fill crops the picture to the exact poster size. fx and fy place the kept window (0 to 1, 0.5 is the center).
+  const crop = { fx: 0.5, fy: 0.5 };
+  const isFill = () => radio('fit') === 'fill';
 
   const sizeInput = $<HTMLInputElement>('size');
   const marginInput = $<HTMLInputElement>('margin');
   const overlapInput = $<HTMLInputElement>('overlap');
+  const fillW = $<HTMLInputElement>('fill-w');
+  const fillH = $<HTMLInputElement>('fill-h');
   const mode = () => radio('mode') as 'across' | 'width' | 'height';
   // Step of the plus and minus buttons, in the unit on screen.
   const stepFor = (m: string) => (m === 'across' || unit === 'in' ? 1 : 2);
@@ -140,9 +179,22 @@ const { preset = null } = Astro.props;
     const unitWord = unit === 'in' ? 'inches' : 'centimeters';
     $('size-label').textContent = m === 'across' ? 'Pages across' : `${m === 'width' ? 'Poster width' : 'Poster height'} (${unitWord})`;
     all('.unit-name').forEach((e) => (e.textContent = unit));
+    fillW.value = String(showLen(vals.width, unit)); fillH.value = String(showLen(vals.height, unit));
+    fillW.step = fillH.step = String(unit === 'in' ? 1 : 2);
+    const fill = isFill();
+    $('fit-fields').hidden = fill; $('fill-fields').hidden = !fill;
+    $('fit-note').textContent = fill
+      ? 'Fill gives exactly the size you type. The picture is cropped to that shape.'
+      : 'Fit shows the whole picture. The poster may have white at the edges.';
     marginInput.step = overlapInput.step = unit === 'in' ? '0.05' : '0.1';
     marginInput.value = String(showLen(marginIn, unit, 3));
     overlapInput.value = String(showLen(overlapIn, unit, 3));
+  }
+
+  // The phone bar button only says Download. The sheet count sits beside it.
+  function dlText(b: HTMLElement, pages = 0) {
+    if (b.classList.contains('bar-btn')) return 'Download';
+    return pages ? `Download ${src?.sample ? 'sample ' : ''}PDF (${pages} ${pages === 1 ? 'page' : 'pages'})` : 'Download PDF';
   }
 
   function setStatus(text: string, kind: typeof statusKind) {
@@ -171,11 +223,64 @@ const { preset = null } = Astro.props;
     box.innerHTML = `<svg class="preview-svg" viewBox="${vb}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <defs><pattern id="hatch" width="0.5" height="0.5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="0.5" height="0.5" fill="var(--card)"/><line x1="0" y1="0" x2="0" y2="0.5" stroke="var(--line)" stroke-width="0.12"/></pattern></defs>
       <rect x="0" y="0" width="${L.gridW}" height="${L.gridH}" fill="url(#hatch)"/>
-      <image href="${src.url}" x="0" y="0" width="${L.posterW}" height="${L.posterH}" preserveAspectRatio="none"/>
+      <svg x="0" y="0" width="${L.posterW}" height="${L.posterH}" viewBox="${L.crop.sx} ${L.crop.sy} ${L.crop.sw} ${L.crop.sh}" preserveAspectRatio="none"><image href="${src.url}" x="0" y="0" width="${src.w}" height="${src.h}" preserveAspectRatio="none"/></svg>
       <g fill="var(--brand)" fill-opacity=".38">${ovl}</g>
       ${boxes}${labels}
     </svg>`;
   }
+
+  /* ---------- Crop preview (Fill) ---------- */
+  // Shows the whole picture with the part that stays lit. Drag it, or use the arrow keys, to move the part that stays.
+  function renderCrop() {
+    const svg = $('crop-svg');
+    const L = current;
+    if (!src || !L || !L.ok || !L.fill) return;
+    const { sx, sy, sw, sh } = L.crop;
+    const sw2 = Math.max(src.w, 1), sh2 = Math.max(src.h, 1);
+    const line = Math.max(src.w, src.h) * 0.006;
+    svg.setAttribute('viewBox', `0 0 ${src.w} ${src.h}`);
+    svg.style.aspectRatio = `${src.w} / ${src.h}`;
+    svg.innerHTML = `<image href="${src.url}" x="0" y="0" width="${sw2}" height="${sh2}" preserveAspectRatio="none"/>
+      <path fill-rule="evenodd" fill="rgba(0,0,0,.58)" d="M0 0H${src.w}V${src.h}H0Z M${sx} ${sy}h${sw}v${sh}h${-sw}Z"/>
+      <rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" fill="none" stroke="#fff" stroke-width="${line * 2.5}"/>
+      <rect x="${sx}" y="${sy}" width="${sw}" height="${sh}" fill="none" stroke="var(--brand)" stroke-width="${line}"/>`;
+    const slack = L.crop.cutPct > 0;
+    svg.style.cursor = slack ? 'grab' : 'default';
+    svg.setAttribute('aria-label', slack ? 'Picture with the kept part outlined. Drag, or use the arrow keys, to move it.' : 'Picture with the kept part outlined. All of it stays.');
+    $('crop-note').textContent = slack
+      ? `About ${L.crop.cutPct}% of the picture is cut off (the dark part). Drag the box to choose what stays.`
+      : 'The picture already has this shape. Nothing is cut off.';
+  }
+  (() => {
+    const svg = $('crop-svg');
+    let drag: { x: number; y: number; fx: number; fy: number } | null = null;
+    // Move the window by a share of the spare picture on each side.
+    const move = (dx: number, dy: number, fx0: number, fy0: number, scale: number) => {
+      if (!src || !current || !current.ok || !current.fill) return;
+      const { sw, sh } = current.crop;
+      const slackX = src.w - sw, slackY = src.h - sh;
+      if (slackX > 1e-6) crop.fx = Math.min(1, Math.max(0, fx0 + (dx * scale) / slackX));
+      if (slackY > 1e-6) crop.fy = Math.min(1, Math.max(0, fy0 + (dy * scale) / slackY));
+      update();
+    };
+    svg.addEventListener('pointerdown', (e) => {
+      drag = { x: e.clientX, y: e.clientY, fx: crop.fx, fy: crop.fy };
+      svg.setPointerCapture(e.pointerId); svg.style.cursor = 'grabbing';
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (!drag || !src) return;
+      const r = svg.getBoundingClientRect();
+      move(e.clientX - drag.x, e.clientY - drag.y, drag.fx, drag.fy, src.w / r.width);
+    });
+    const end = () => { drag = null; svg.style.cursor = current?.crop?.cutPct ? 'grab' : 'default'; };
+    svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+    svg.addEventListener('keydown', (e) => {
+      const k: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+      if (!k[e.key] || !src) return;
+      e.preventDefault();
+      move(k[e.key][0], k[e.key][1], crop.fx, crop.fy, src.w * 0.03);
+    });
+  })();
 
   /* ---------- Summary ---------- */
   function update() {
@@ -184,6 +289,7 @@ const { preset = null } = Astro.props;
     const L = layout({
       imgW: src.w, imgH: src.h, paper: ($('paper') as HTMLSelectElement).value, orientation: radio('orient'),
       mode: mode(), value: vals[mode()], unit: 'in', margin: marginIn, overlap: overlapIn,
+      fit: radio('fit'), fillW: vals.width, fillH: vals.height, fx: crop.fx, fy: crop.fy,
     });
     current = L;
     const dls = all('.dl-btn') as HTMLButtonElement[];
@@ -191,11 +297,11 @@ const { preset = null } = Astro.props;
     $('preview').classList.toggle('opacity-40', !L.ok);
     if (!L.ok) {
       // Clear the numbers so old values do not sit beside an error.
-      ['st-sheets', 'st-size', 'st-quality'].forEach((id) => { $(id).textContent = '-'; });
+      ['st-sheets', 'st-size', 'st-quality', 'bar-sheets', 'bar-size'].forEach((id) => { $(id).textContent = '-'; });
       tips = [];
       sum.textContent = L.error;
       sum.className = 'min-h-[4.5rem] text-sm font-medium text-brand-ink lg:order-5';
-      dls.forEach((b) => { b.disabled = true; b.textContent = 'Download PDF'; });
+      dls.forEach((b) => { b.disabled = true; b.textContent = dlText(b); });
       tests.forEach((b) => { b.disabled = true; });
       if (!busy) setStatus(L.error, 'invalid');
       return;
@@ -205,13 +311,17 @@ const { preset = null } = Astro.props;
     const f = (v: number) => showLen(v, unit, 1);
     $('st-sheets').textContent = `${L.sheets} (${L.cols} × ${L.rows})`;
     $('st-size').textContent = `${f(L.posterW)} × ${f(L.posterH)} ${unit}`;
+    $('bar-sheets').textContent = `${L.sheets} ${L.sheets === 1 ? 'sheet' : 'sheets'} (${L.cols} × ${L.rows})`;
+    $('bar-size').textContent = `${f(L.posterW)} × ${f(L.posterH)} ${unit}${L.fill && L.crop.cutPct ? `, ${L.crop.cutPct}% cut off` : ''}`;
     $('st-quality').textContent = `${Math.round(L.dpi)} dpi, ${L.quality.level}`;
     tips = wasteTip(L, unit);
-    const qcheck = L.dpi >= 150
+    const qcheck = L.fill && L.dpi < 150
+      ? `Quality check: looks sharp at 150 dpi or more. Yours is ${Math.round(L.dpi)} dpi. Make the poster smaller or use a bigger image.`
+      : L.dpi >= 150
       ? `Quality check: ${Math.round(L.dpi)} dpi. This looks sharp. 150 dpi or more is enough.`
       : `Quality check: looks sharp at 150 dpi or more. Yours is ${Math.round(L.dpi)} dpi. Pick fewer pages or a bigger image. This image gives 150 dpi up to ${f(src.w / 150)} ${unit} wide.`;
     const lines = [
-      `<p class="mb-1">${L.cols} pages across and ${L.rows} down. Each page prints ${f(L.printW)} × ${f(L.printH)} ${unit} of the picture. The poster shows your whole image. Nothing is cropped.</p>`,
+      `<p class="mb-1">${L.cols} pages across and ${L.rows} down. Each page prints ${f(L.printW)} × ${f(L.printH)} ${unit} of the picture. ${L.fill ? (L.crop.cutPct ? `The picture is cropped to fill ${f(L.posterW)} × ${f(L.posterH)} ${unit}. About ${L.crop.cutPct}% of it is cut off.` : `The picture already has this shape. Nothing is cropped.`) : 'The poster shows your whole image. Nothing is cropped.'}</p>`,
       `<p class="mb-1">${qcheck}</p>`,
       ...tips.map((t, i) => `<p class="mb-1">${t.text} <button type="button" class="font-semibold text-brand-ink underline underline-offset-4" data-fix="${i}">Apply</button></p>`),
     ];
@@ -220,12 +330,13 @@ const { preset = null } = Astro.props;
       const pages = L.sheets + (($('opt-map') as HTMLInputElement).checked ? 1 : 0);
       dls.forEach((b) => {
         b.disabled = false;
-        b.textContent = `Download ${src!.sample ? 'sample ' : ''}PDF (${pages} ${pages === 1 ? 'page' : 'pages'})`;
+        b.textContent = dlText(b, pages);
       });
       tests.forEach((b) => { b.disabled = L.sheets < 2; });
     }
     saveSettings();
     renderPreview();
+    renderCrop();
   }
 
   $('summary').addEventListener('click', (e) => {
@@ -266,22 +377,29 @@ const { preset = null } = Astro.props;
     }
   }
 
-  function makeSample(): Promise<Blob> {
+  // The sample has the shape given by the guide page (or 3:2 on the home page), so its sheet count matches the page text.
+  function makeSample(shape: [number, number] = [3, 2]): Promise<Blob> {
     const c = document.createElement('canvas');
-    c.width = 1800; c.height = 1200;
+    const k = 1800 / Math.max(shape[0], shape[1]);
+    c.width = Math.round(shape[0] * k); c.height = Math.round(shape[1] * k);
+    return drawSample(c);
+  }
+
+  function drawSample(c: HTMLCanvasElement): Promise<Blob> {
+    const W = c.width, H = c.height, u = H / 1200;
     const g = c.getContext('2d')!;
-    const sky = g.createLinearGradient(0, 0, 0, 800);
+    const sky = g.createLinearGradient(0, 0, 0, H * 0.67);
     sky.addColorStop(0, '#2b5fa8'); sky.addColorStop(1, '#f6d7a8');
-    g.fillStyle = sky; g.fillRect(0, 0, 1800, 1200);
-    g.fillStyle = '#fff6d8'; g.beginPath(); g.arc(1330, 300, 130, 0, Math.PI * 2); g.fill();
+    g.fillStyle = sky; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#fff6d8'; g.beginPath(); g.arc(W * 0.74, H * 0.25, Math.min(130 * u, W * 0.08), 0, Math.PI * 2); g.fill();
     const hill = (y: number, col: string, amp: number, ph: number) => {
-      g.fillStyle = col; g.beginPath(); g.moveTo(0, 1200);
-      for (let x = 0; x <= 1800; x += 20) g.lineTo(x, y + Math.sin(x / 260 + ph) * amp);
-      g.lineTo(1800, 1200); g.closePath(); g.fill();
+      g.fillStyle = col; g.beginPath(); g.moveTo(0, H);
+      for (let x = 0; x <= W; x += 10) g.lineTo(x, (y + Math.sin(x / (260 * u) + ph) * amp) * u);
+      g.lineTo(W, H); g.closePath(); g.fill();
     };
     hill(640, '#c9794a', 70, 0.5); hill(780, '#8f4a2c', 90, 2); hill(930, '#4a2a22', 60, 4);
-    g.fillStyle = '#fff'; g.font = '700 150px ui-sans-serif, system-ui, sans-serif'; g.textAlign = 'center';
-    g.fillText('Your poster', 900, 1110);
+    g.fillStyle = '#fff'; g.font = `700 ${Math.min(150 * u, W * 0.11)}px ui-sans-serif, system-ui, sans-serif`; g.textAlign = 'center';
+    g.fillText('Your poster', W / 2, H * 0.925);
     return new Promise((res) => c.toBlob((b) => res(b!), 'image/png'));
   }
 
@@ -326,6 +444,14 @@ const { preset = null } = Astro.props;
   }));
   marginInput.addEventListener('input', () => { const v = parseFloat(marginInput.value); marginIn = isNaN(v) ? NaN : toInches(v, unit); update(); });
   overlapInput.addEventListener('input', () => { const v = parseFloat(overlapInput.value); overlapIn = isNaN(v) ? NaN : toInches(v, unit); update(); });
+  all('input[name="fit"]').forEach((e) => e.addEventListener('change', () => { syncInputs(); update(); }));
+  const fillInput = (el: HTMLInputElement, key: 'width' | 'height') => el.addEventListener('input', () => {
+    const v = parseFloat(el.value);
+    vals[key] = isNaN(v) ? 0 : toInches(v, unit);
+    update();
+  });
+  fillInput(fillW, 'width'); fillInput(fillH, 'height');
+  fillW.addEventListener('change', syncInputs); fillH.addEventListener('change', syncInputs);
   ['paper', 'opt-map'].forEach((id) => $(id).addEventListener('input', update));
   all('input[name="orient"]').forEach((e) => e.addEventListener('change', update));
 
@@ -338,18 +464,21 @@ const { preset = null } = Astro.props;
   const MAX_DPI = 200; // above this a home printer shows no gain, and the PDF only gets heavier
   const JPEG_QUALITY = 0.92;
 
-  async function prepareJpeg(blob: Blob, posterIn: number): Promise<Uint8Array> {
+  // area is the part of the picture to keep, in picture pixels. Fill uses it to cut the picture to the poster shape.
+  async function prepareJpeg(blob: Blob, posterIn: number, area: { sx: number; sy: number; sw: number; sh: number }): Promise<Uint8Array> {
     const bmp = await bitmapOf(blob);
-    let scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height), Math.sqrt(MAX_PIXELS / (bmp.width * bmp.height)), (MAX_DPI * posterIn) / bmp.width);
+    const sx = Math.round(area.sx), sy = Math.round(area.sy);
+    const sw = Math.max(1, Math.min(bmp.width - sx, Math.round(area.sw))), sh = Math.max(1, Math.min(bmp.height - sy, Math.round(area.sh)));
+    let scale = Math.min(1, MAX_SIDE / Math.max(sw, sh), Math.sqrt(MAX_PIXELS / (sw * sh)), (MAX_DPI * posterIn) / sw);
     for (let attempt = 0; attempt < 5; attempt++) {
       const c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(bmp.width * scale));
-      c.height = Math.max(1, Math.round(bmp.height * scale));
+      c.width = Math.max(1, Math.round(sw * scale));
+      c.height = Math.max(1, Math.round(sh * scale));
       const g = c.getContext('2d');
       if (g) {
         g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
         g.imageSmoothingQuality = 'high';
-        g.drawImage(bmp, 0, 0, c.width, c.height);
+        g.drawImage(bmp, sx, sy, sw, sh, 0, 0, c.width, c.height);
         const out: Blob | null = await new Promise((res) => c.toBlob(res, 'image/jpeg', JPEG_QUALITY));
         if (out && out.size > 0) { bmp.close(); return new Uint8Array(await out.arrayBuffer()); }
       }
@@ -362,11 +491,11 @@ const { preset = null } = Astro.props;
   async function download(test = false) {
     if (!src || !current || !current.ok || busy) return;
     const L = current, btns = all('.dl-btn, .test-btn') as HTMLButtonElement[];
-    busy = true; btns.forEach((b) => { b.disabled = true; if (b.classList.contains('dl-btn')) b.textContent = 'Building PDF...'; });
+    busy = true; btns.forEach((b) => { b.disabled = true; if (b.classList.contains('dl-btn')) b.textContent = b.classList.contains('bar-btn') ? 'Building...' : 'Building PDF...'; });
     setStatus('Preparing your image...', 'progress');
     try {
       const [lib, { buildPdf }] = await Promise.all([import('pdf-lib'), import('../lib/pdf.js')]);
-      const jpg = await prepareJpeg(src.blob, L.posterW);
+      const jpg = await prepareJpeg(src.blob, L.posterW, L.crop);
       const bytes = await buildPdf(lib, L, { bytes: jpg, type: 'jpg' }, {
         marks: ($('opt-marks') as HTMLInputElement).checked,
         labels: ($('opt-labels') as HTMLInputElement).checked,
@@ -397,7 +526,7 @@ const { preset = null } = Astro.props;
     if ($('tool').dataset.preset) return; // a landing page must not overwrite the home page settings
     try {
       localStorage.setItem(KEY, JSON.stringify({
-        paper: ($('paper') as HTMLSelectElement).value, orient: radio('orient'), mode: mode(), unit, vals, marginIn, overlapIn,
+        paper: ($('paper') as HTMLSelectElement).value, orient: radio('orient'), fit: radio('fit'), mode: mode(), unit, vals, marginIn, overlapIn,
         checks: checks.map((id) => ($(id) as HTMLInputElement).checked),
       }));
     } catch { /* storage is blocked: the tool still works */ }
@@ -412,6 +541,7 @@ const { preset = null } = Astro.props;
       if (el) el.checked = true;
     };
     pick('orient', s.orient, ['portrait', 'landscape']);
+    pick('fit', s.fit, ['fit', 'fill']);
     pick('mode', s.mode, ['across', 'width', 'height']);
     pick('unit', s.unit, ['in', 'cm']);
     unit = radio('unit') as 'in' | 'cm';
@@ -426,8 +556,9 @@ const { preset = null } = Astro.props;
     const p = JSON.parse(presetRaw);
     const m = p.mode as 'across' | 'width' | 'height';
     const v = Number(p.value);
-    applySettings({ paper: p.paper, orient: p.orient, mode: m, unit: p.unit });
+    applySettings({ paper: p.paper, orient: p.orient, mode: m, unit: p.unit, fit: p.fit === 'fill' ? 'fill' : 'fit' });
     if (m === 'across') vals.across = v; else vals[m] = toInches(v, unit);
+    if (p.fit === 'fill') { vals.width = toInches(p.w, unit); vals.height = toInches(p.h, unit); }
   } else {
     try { applySettings(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch { /* ignore a bad saved value */ }
   }
@@ -435,5 +566,7 @@ const { preset = null } = Astro.props;
 
   /* ---------- Start ---------- */
   syncInputs();
-  makeSample().then((b) => setSource(b, 'Sample', true));
+  let shape: [number, number] | undefined;
+  try { const sh = presetRaw && JSON.parse(presetRaw).shape; if (Array.isArray(sh) && sh[0] > 0 && sh[1] > 0) shape = [sh[0], sh[1]]; } catch { /* use the default shape */ }
+  makeSample(shape).then((b) => setSource(b, 'Sample', true));
 </script>
