@@ -1,0 +1,78 @@
+---
+import Base from '../layouts/Base.astro';
+import Tool from '../components/Tool.astro';
+import { cases } from '../data/cases.ts';
+import { layout } from '../lib/tile.js';
+import { withBase } from '../lib/url.ts';
+
+export function getStaticPaths() {
+  return cases.map((c) => ({ params: { slug: c.slug }, props: { c } }));
+}
+const { c } = Astro.props;
+
+// Table rows come from the tool's own math: 0.25 in margin, 0.5 in overlap.
+const base = { margin: 0.25, overlap: 0.5, unit: 'in' };
+const cell = (l: any) => (l.ok ? `${l.cols} x ${l.rows} (${l.sheets} sheets)` : '-');
+const t = c.table;
+let head: string[] = [];
+let rows: string[][] = [];
+if (t.kind === 'sizes') {
+  // Labels that already say the orientation (for example "Letter, portrait") give one column only.
+  const only = t.papers.some(([, l]) => l.includes('portrait') || l.includes('landscape'));
+  const cols2 = only
+    ? t.papers.map(([k, l]) => [k, l.includes('landscape') ? 'landscape' : 'portrait', l])
+    : t.papers.flatMap(([k, l]) => [[k, 'portrait', `${l}, portrait`], [k, 'landscape', `${l}, landscape`]]);
+  head = ['Poster size', ...cols2.map((x) => x[2])];
+  rows = t.sizes.map((s) => [`${s.w} x ${s.h} in`, ...cols2.map(([k, o]) => cell(layout({ ...base, imgW: s.w * 100, imgH: s.h * 100, paper: k, orientation: o, mode: 'width', value: s.w })))]);
+} else {
+  head = ['Picture shape', 'Letter', 'A4', 'Tabloid (11 x 17)'];
+  rows = t.shapes.map(([w, h, label]) => [label, ...(['letter', 'a4', 'tabloid'] as const).map((k) => {
+    const l = layout({ ...base, imgW: w * 100, imgH: h * 100, paper: k, orientation: 'portrait', mode: 'across', value: t.pages });
+    return l.ok ? `${l.posterW.toFixed(1)} x ${l.posterH.toFixed(1)} in, ${l.cols} x ${l.rows}` : '-';
+  })]);
+}
+
+const jsonLd = [{
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: c.faq.map((f: any) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+}];
+const related = c.related.map((s: string) => cases.find((x) => x.slug === s)).filter(Boolean);
+---
+<Base title={c.title} description={c.description} jsonLd={jsonLd}>
+  <section class="mx-auto max-w-5xl px-4 pt-8 sm:pt-10">
+    <nav aria-label="Breadcrumb" class="mb-3 text-sm text-muted"><a href={withBase('/')} class="underline underline-offset-4 hover:text-ink">Poster tiler</a> / guide</nav>
+    <h1 class="max-w-3xl text-3xl font-extrabold leading-[1.08] tracking-tight [text-wrap:balance] sm:text-5xl">{c.h1}</h1>
+    <div class="mt-3 max-w-2xl space-y-2 text-base text-muted sm:text-lg">
+      {c.intro.map((p: string) => <p>{p}</p>)}
+    </div>
+    <div class="mt-6"><Tool preset={c.preset} /></div>
+  </section>
+  <section class="mx-auto max-w-5xl px-4 pt-16">
+    <article class="prose-site">
+      <h2 style="margin-top:0">{t.caption}</h2>
+      <p>These counts use a 0.25 inch printer margin and a 0.5 inch overlap. The tool above shows the exact numbers for your picture.</p>
+      <div class="overflow-x-auto"><table class="data-table">
+        <caption class="sr-only">{t.caption}</caption>
+        <thead><tr>{head.map((h) => <th scope="col">{h}</th>)}</tr></thead>
+        <tbody>{rows.map((r) => <tr>{r.map((v, i) => i === 0 ? <th scope="row">{v}</th> : <td>{v}</td>)}</tr>)}</tbody>
+      </table></div>
+      {c.sections.map((s: any) => (
+        <>
+          <h2>{s.h}</h2>
+          {s.p && s.p.map((p: string) => <p>{p}</p>)}
+          {s.ul && <ul>{s.ul.map((li: string) => <li>{li}</li>)}</ul>}
+        </>
+      ))}
+      <h2>Print at actual size</h2>
+      <p>In the print dialog, choose 100% or Actual size. Do not choose Fit to page. That setting shrinks every tile, and the pieces will not line up. Print the test page first and measure it.</p>
+      <h2>Questions</h2>
+      {c.faq.map((f: any) => (<><h3>{f.q}</h3><p>{f.a}</p></>))}
+      <h2>More poster guides</h2>
+      <ul>
+        {related.map((r: any) => <li><a href={withBase(`/${r.slug}/`)}>{r.h1}</a></li>)}
+        <li><a href={withBase('/')}>Poster tiler: all paper sizes and settings</a></li>
+      </ul>
+    </article>
+  </section>
+</Base>

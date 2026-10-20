@@ -6,7 +6,8 @@ const PT = 72;
 
 export async function buildPdf(lib, L, image, opts = {}, onProgress = () => {}) {
   const { PDFDocument, StandardFonts, rgb, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = lib;
-  const { marks = true, labels = true, map = false, unit = 'in' } = opts;
+  // `only` = [column, row] builds a one-page test print of that tile.
+  const { marks = true, labels = true, map = false, unit = 'in', only = null } = opts;
   const doc = await PDFDocument.create();
   doc.setTitle('Poster tiles');
   doc.setProducer('printlargeposter.com');
@@ -16,12 +17,13 @@ export async function buildPdf(lib, L, image, opts = {}, onProgress = () => {}) 
   const pw = L.page.w * PT;
   const ph = L.page.h * PT;
   const m = L.margin * PT;
-  const total = L.sheets + (map ? 1 : 0);
+  const total = only ? 1 : L.sheets + (map ? 1 : 0);
   const black = rgb(0, 0, 0);
   let done = 0;
 
   for (let r = 0; r < L.rows; r++) {
     for (let c = 0; c < L.cols; c++) {
+      if (only && (only[0] !== c || only[1] !== r)) continue;
       const page = doc.addPage([pw, ph]);
       const o = tileOrigin(L, c, r);
       // Clip to the printable box, then draw the whole poster image shifted so this tile sits in the box.
@@ -56,7 +58,7 @@ export async function buildPdf(lib, L, image, opts = {}, onProgress = () => {}) 
       await new Promise((res) => setTimeout(res, 0));
     }
   }
-  if (map) {
+  if (map && !only) {
     drawMap(doc, L, font, bold, rgb, unit);
     done++;
     onProgress(done, total);

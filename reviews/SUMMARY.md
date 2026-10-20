@@ -60,3 +60,22 @@ Review findings fixed:
 18. How many pages for a 27x40 poster
 19. Print a poster on Legal or Tabloid paper
 20. Blow up a drawing to poster size
+
+## Gap fix (Sam, 2026-10-20)
+Done:
+- Gap 3: the poster always follows the image shape, so nothing is cropped. The summary now says so ("The poster shows your whole image. Nothing is cropped.").
+- Gap 4: 72 px bottom padding under the preview card on phones, so the sticky Download bar does not hide the last row.
+- Gap 5: "How to assemble" list (3 steps) under the summary.
+- Gap 6: plain "Quality check" line with the 150 dpi rule and the width that gives 150 dpi.
+- Gap 7: "Print a test page first (A1 only)" button (desktop block and phone bar). `buildPdf` takes `only: [col, row]`. Tests added.
+- Gap 8: last settings (paper, orientation, size mode and values, unit, margin, overlap, checkboxes) saved in localStorage, wrapped in try/catch. Landing pages use their own preset and do not save.
+- Gap 9: 10 pre-rendered pages from `src/data/cases.ts` via `src/pages/[slug].astro`: 24x36, 18x24, 36x48 on Letter; 24x36 on A4; A4 3x3; 2x2; 3x3; banner; classroom bulletin board; large map. Each has its own title, H1, preset, computed sheet table, written sections, FAQ (with FAQPage schema) and links. Linked from the home page. Tests check counts, unique slugs, title length, no dashes.
+- Gap 1: A3, Tabloid and A5 already existed.
+- `npm test` now runs with `--experimental-strip-types` (it imports the .ts case data).
+Skipped:
+- A2 paper: plotter size, almost no home or office printer takes it.
+- Gap 2 (metric default): US target, inches stay first; cm toggle already exists.
+- Gap 10 (PNG per tile): needs a zip library, extra weight for few users.
+- Gap 11 (halftone): against the plain, private pitch.
+- Word, Mac and Adobe pages: could not verify the steps for those apps here, and Word has no tiling, so no thin or wrong pages.
+Lighthouse (local): home mobile 85 on first run (noisy, machine was busy; was 100 before), desktop 99; guide page mobile 100, desktop 99; accessibility, best practices, SEO 100 everywhere.

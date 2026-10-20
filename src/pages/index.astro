@@ -6,6 +6,8 @@ import Article from '../components/Article.astro';
 import Faq from '../components/Faq.astro';
 import site from '../site.config.ts';
 import { faq } from '../data/faq.ts';
+import { cases } from '../data/cases.ts';
+import { withBase } from '../lib/url.ts';
 
 const base = `https://${site.domain}`;
 const jsonLd = [
@@ -44,5 +46,12 @@ const jsonLd = [
     <AdSlot />
   </section>
   <Article />
+  <section aria-labelledby="guides" class="mx-auto max-w-5xl px-4 pt-16">
+    <h2 id="guides" class="text-2xl font-bold tracking-tight">Poster guides by size and paper</h2>
+    <p class="mt-2 max-w-2xl text-muted">Each guide opens the tool with the right size set and lists how many sheets you need.</p>
+    <ul class="mt-4 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+      {cases.map((c) => <li><a href={withBase(`/${c.slug}/`)} class="inline-block py-2 text-brand-ink underline underline-offset-4">{c.h1}</a></li>)}
+    </ul>
+  </section>
   <Faq />
 </Base>

@@ -150,3 +150,29 @@ assert.ok(td, 'label position');
 assert.ok(+td[1] > 612 * 0.7 && +td[2] < 792 * 0.2, 'label is near the bottom right');
 
 console.log('All tests passed');
+
+// Test page: only tile (0,0) is built, and no map page
+const bo = await buildPdf(lib, L, { bytes: png, type: 'png' }, { marks: true, labels: true, map: true, only: [0, 0] });
+assert.equal((await lib.PDFDocument.load(bo)).getPageCount(), 1);
+const bo2 = await buildPdf(lib, L, { bytes: png, type: 'png' }, { marks: true, labels: true, only: [2, 1] });
+assert.equal((await lib.PDFDocument.load(bo2)).getPageCount(), 1);
+
+// Landing page presets: the counts written on the pages match the math
+const cnt = (o) => t.layout({ ...base, imgW: 2000, imgH: 3000, mode: 'width', unit: 'in', ...o });
+assert.equal(cnt({ value: 24 }).sheets, 16);
+assert.equal(cnt({ value: 24, orientation: 'landscape' }).sheets, 15);
+assert.equal(cnt({ value: 18, imgW: 3, imgH: 4 }).sheets, 9);
+assert.equal(t.layout({ ...base, imgW: 3, imgH: 4, paper: 'a4', mode: 'across', value: 3 }).sheets, 9);
+assert.equal(t.layout({ ...base, imgW: 8, imgH: 1, orientation: 'landscape', mode: 'height', value: 8 }).rows, 1);
+{
+  const { cases } = await import('../src/data/cases.ts');
+  assert.equal(cases.length, 10);
+  assert.equal(new Set(cases.map((c) => c.slug)).size, 10);
+  for (const c of cases) {
+    assert.ok(c.title.length <= 45, c.title);
+    assert.ok(c.preset.paper in t.PAPER, c.slug);
+    for (const r of c.related) assert.ok(cases.some((x) => x.slug === r), `${c.slug} -> ${r}`);
+    assert.ok(!/[—–]/.test(JSON.stringify(c)), `${c.slug} has a dash`);
+  }
+}
+console.log('Landing page checks passed');

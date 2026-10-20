@@ -1,7 +1,9 @@
 ---
 import { PAPER } from '../lib/tile.js';
+// A landing page can start the tool on a set case: { paper, orient, mode, value, unit }.
+const { preset = null } = Astro.props;
 ---
-<section id="tool" aria-label="Poster tiler" class="grid gap-4 lg:grid-cols-[21.5rem_minmax(0,1fr)] lg:items-start lg:gap-6">
+<section id="tool" aria-label="Poster tiler" data-preset={preset ? JSON.stringify(preset) : undefined} class="grid gap-4 lg:grid-cols-[21.5rem_minmax(0,1fr)] lg:items-start lg:gap-6">
   <!-- 1. Image -->
   <div class="rounded-2xl border border-line bg-card p-4 lg:col-start-1">
     <p class="field-label" id="img-h">1. Your image</p>
@@ -14,7 +16,7 @@ import { PAPER } from '../lib/tile.js';
   </div>
 
   <!-- Preview -->
-  <div class="rounded-2xl border border-line bg-card p-3 sm:p-4 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:sticky lg:top-20 flex flex-col gap-3" id="drop">
+  <div class="rounded-2xl border border-line bg-card p-3 sm:p-4 lg:col-start-2 lg:row-start-1 lg:row-span-3 lg:sticky lg:top-20 flex flex-col gap-3 max-lg:pb-[72px]" id="drop">
     <div id="preview" class="relative h-[19rem] overflow-hidden rounded-xl border border-line bg-paper sm:h-[30rem] lg:order-3 lg:h-[24rem]" role="img" aria-label="Preview of the poster split into pages" aria-describedby="summary">
       <div id="preview-inner" class="absolute inset-0 p-2"></div>
     </div>
@@ -26,9 +28,18 @@ import { PAPER } from '../lib/tile.js';
     </dl>
     <div class="hidden lg:order-2 lg:block">
       <button type="button" class="btn-primary dl-btn" disabled>Download PDF</button>
+      <button type="button" class="btn-ghost test-btn mt-2" disabled>Print a test page first (A1 only)</button>
       <p role="status" class="dl-status mt-2 text-sm font-semibold text-ink">Print at 100% (Actual size). Do not choose Fit to page.</p>
     </div>
     <div id="summary" aria-live="polite" aria-atomic="true" class="min-h-[4.5rem] text-sm text-muted lg:order-5"></div>
+    <div class="text-sm text-muted lg:order-6">
+      <p class="font-semibold text-ink">How to assemble</p>
+      <ol class="mt-1 list-decimal space-y-0.5 pl-5">
+        <li>Print one page and check it. Print at 100%.</li>
+        <li>Trim the white edge along the solid marks. Keep the dashed edges.</li>
+        <li>Line up pages A1 and A2, then B1 and B2. Glue each strip.</li>
+      </ol>
+    </div>
   </div>
 
   <!-- 2. Settings -->
@@ -88,6 +99,7 @@ import { PAPER } from '../lib/tile.js';
   <!-- Download bar on phones. It stays at the bottom of the screen while you change settings. -->
   <div class="sticky bottom-2 z-10 rounded-2xl border border-line bg-card p-3 shadow-lg lg:hidden">
     <button type="button" class="btn-primary dl-btn" disabled>Download PDF</button>
+    <button type="button" class="btn-ghost test-btn mt-2" disabled>Print a test page first (A1 only)</button>
     <p role="status" class="dl-status mt-2 text-xs font-semibold text-ink">Print at 100% (Actual size). Do not choose Fit to page.</p>
   </div>
   <noscript><p class="rounded-xl border border-line bg-card p-4">This tool needs JavaScript. Turn it on to split your image into pages.</p></noscript>
@@ -175,6 +187,7 @@ import { PAPER } from '../lib/tile.js';
     });
     current = L;
     const dls = all('.dl-btn') as HTMLButtonElement[];
+    const tests = all('.test-btn') as HTMLButtonElement[];
     $('preview').classList.toggle('opacity-40', !L.ok);
     if (!L.ok) {
       // Clear the numbers so old values do not sit beside an error.
@@ -183,6 +196,7 @@ import { PAPER } from '../lib/tile.js';
       sum.textContent = L.error;
       sum.className = 'min-h-[4.5rem] text-sm font-medium text-brand-ink lg:order-5';
       dls.forEach((b) => { b.disabled = true; b.textContent = 'Download PDF'; });
+      tests.forEach((b) => { b.disabled = true; });
       if (!busy) setStatus(L.error, 'invalid');
       return;
     }
@@ -193,9 +207,12 @@ import { PAPER } from '../lib/tile.js';
     $('st-size').textContent = `${f(L.posterW)} × ${f(L.posterH)} ${unit}`;
     $('st-quality').textContent = `${Math.round(L.dpi)} dpi, ${L.quality.level}`;
     tips = wasteTip(L, unit);
+    const qcheck = L.dpi >= 150
+      ? `Quality check: ${Math.round(L.dpi)} dpi. This looks sharp. 150 dpi or more is enough.`
+      : `Quality check: looks sharp at 150 dpi or more. Yours is ${Math.round(L.dpi)} dpi. Pick fewer pages or a bigger image. This image gives 150 dpi up to ${f(src.w / 150)} ${unit} wide.`;
     const lines = [
-      `<p class="mb-1">${L.cols} pages across and ${L.rows} down. Each page prints ${f(L.printW)} × ${f(L.printH)} ${unit} of the picture.</p>`,
-      `<p class="mb-1">At ${Math.round(L.dpi)} dpi the poster looks ${L.quality.text}.${L.dpi < 120 ? ` This image gives 150 dpi up to ${f(src.w / 150)} ${unit} wide.` : ''}</p>`,
+      `<p class="mb-1">${L.cols} pages across and ${L.rows} down. Each page prints ${f(L.printW)} × ${f(L.printH)} ${unit} of the picture. The poster shows your whole image. Nothing is cropped.</p>`,
+      `<p class="mb-1">${qcheck}</p>`,
       ...tips.map((t, i) => `<p class="mb-1">${t.text} <button type="button" class="font-semibold text-brand-ink underline underline-offset-4" data-fix="${i}">Apply</button></p>`),
     ];
     sum.innerHTML = lines.join('');
@@ -205,7 +222,9 @@ import { PAPER } from '../lib/tile.js';
         b.disabled = false;
         b.textContent = `Download ${src!.sample ? 'sample ' : ''}PDF (${pages} ${pages === 1 ? 'page' : 'pages'})`;
       });
+      tests.forEach((b) => { b.disabled = L.sheets < 2; });
     }
+    saveSettings();
     renderPreview();
   }
 
@@ -340,10 +359,10 @@ import { PAPER } from '../lib/tile.js';
     throw new Error('canvas');
   }
 
-  async function download() {
+  async function download(test = false) {
     if (!src || !current || !current.ok || busy) return;
-    const L = current, btns = all('.dl-btn') as HTMLButtonElement[];
-    busy = true; btns.forEach((b) => { b.disabled = true; b.textContent = 'Building PDF...'; });
+    const L = current, btns = all('.dl-btn, .test-btn') as HTMLButtonElement[];
+    busy = true; btns.forEach((b) => { b.disabled = true; if (b.classList.contains('dl-btn')) b.textContent = 'Building PDF...'; });
     setStatus('Preparing your image...', 'progress');
     try {
       const [lib, { buildPdf }] = await Promise.all([import('pdf-lib'), import('../lib/pdf.js')]);
@@ -353,20 +372,66 @@ import { PAPER } from '../lib/tile.js';
         labels: ($('opt-labels') as HTMLInputElement).checked,
         map: ($('opt-map') as HTMLInputElement).checked,
         unit,
+        only: test ? [0, 0] : null,
       }, (d: number, t: number) => setStatus(`Building page ${d} of ${t}...`, 'progress'));
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
       const a = document.createElement('a');
-      a.href = url; a.download = `poster-${L.cols}x${L.rows}-pages.pdf`;
+      a.href = url; a.download = test ? 'poster-test-page-A1.pdf' : `poster-${L.cols}x${L.rows}-pages.pdf`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      setStatus('Done. Open the PDF and print at 100% (Actual size). Do not choose Fit to page.', 'done');
+      setStatus(test ? 'Done. Print page A1 at 100% (Actual size) and check the size and the margins. Then download the full PDF.' : 'Done. Open the PDF and print at 100% (Actual size). Do not choose Fit to page.', 'done');
     } catch {
       setStatus('The PDF could not be built. Try a smaller image or a smaller poster.', 'failed');
     } finally {
       busy = false; update();
     }
   }
-  all('.dl-btn').forEach((b) => b.addEventListener('click', download));
+  all('.dl-btn').forEach((b) => b.addEventListener('click', () => download(false)));
+  all('.test-btn').forEach((b) => b.addEventListener('click', () => download(true)));
+
+  /* ---------- Saved settings ---------- */
+  // The last settings stay in this browser only. A landing page preset wins over saved settings.
+  const KEY = 'poster-tiler-settings-v1';
+  const checks = ['opt-marks', 'opt-labels', 'opt-map'];
+  function saveSettings() {
+    if ($('tool').dataset.preset) return; // a landing page must not overwrite the home page settings
+    try {
+      localStorage.setItem(KEY, JSON.stringify({
+        paper: ($('paper') as HTMLSelectElement).value, orient: radio('orient'), mode: mode(), unit, vals, marginIn, overlapIn,
+        checks: checks.map((id) => ($(id) as HTMLInputElement).checked),
+      }));
+    } catch { /* storage is blocked: the tool still works */ }
+  }
+  const num = (v: unknown, fallback: number) => (typeof v === 'number' && isFinite(v) ? v : fallback);
+  function applySettings(s: any) {
+    if (!s || typeof s !== 'object') return;
+    const paperSel = $('paper') as HTMLSelectElement;
+    if (typeof s.paper === 'string' && s.paper in PAPER_KEYS) paperSel.value = s.paper;
+    const pick = (name: string, v: unknown, ok: string[]) => {
+      const el = typeof v === 'string' && ok.includes(v) ? document.querySelector<HTMLInputElement>(`input[name="${name}"][value="${v}"]`) : null;
+      if (el) el.checked = true;
+    };
+    pick('orient', s.orient, ['portrait', 'landscape']);
+    pick('mode', s.mode, ['across', 'width', 'height']);
+    pick('unit', s.unit, ['in', 'cm']);
+    unit = radio('unit') as 'in' | 'cm';
+    if (s.vals) { vals.across = Math.round(num(s.vals.across, 3)) || 3; vals.width = num(s.vals.width, 24); vals.height = num(s.vals.height, 36); }
+    marginIn = num(s.marginIn, 0.25);
+    overlapIn = num(s.overlapIn, 0.5);
+    if (Array.isArray(s.checks)) checks.forEach((id, i) => { if (typeof s.checks[i] === 'boolean') ($(id) as HTMLInputElement).checked = s.checks[i]; });
+  }
+  const PAPER_KEYS = Object.fromEntries(Array.from(($('paper') as HTMLSelectElement).options).map((o) => [o.value, 1]));
+  const presetRaw = $('tool').dataset.preset;
+  if (presetRaw) {
+    const p = JSON.parse(presetRaw);
+    const m = p.mode as 'across' | 'width' | 'height';
+    const v = Number(p.value);
+    applySettings({ paper: p.paper, orient: p.orient, mode: m, unit: p.unit });
+    if (m === 'across') vals.across = v; else vals[m] = toInches(v, unit);
+  } else {
+    try { applySettings(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch { /* ignore a bad saved value */ }
+  }
+  ['opt-marks', 'opt-labels'].forEach((id) => $(id).addEventListener('change', saveSettings));
 
   /* ---------- Start ---------- */
   syncInputs();
