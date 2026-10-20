@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-*
+tmp-*
+.astro
+.wrangler
+.playwright-cli
+screenshots
