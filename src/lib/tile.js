@@ -12,6 +12,8 @@ const EPS = 1e-6;
 
 export const toInches = (v, unit) => (unit === 'cm' ? v / 2.54 : v);
 export const fromInches = (v, unit) => (unit === 'cm' ? v * 2.54 : v);
+// A length for display or an input box. The stored value stays in inches, so switching units never drifts.
+export const showLen = (inches, unit, digits = 2) => Math.round(fromInches(inches, unit) * 10 ** digits) / 10 ** digits;
 
 export function pageSize(paperKey, orientation) {
   const p = PAPER[paperKey] || PAPER.letter;
@@ -52,7 +54,8 @@ export function layout(opts) {
   const fail = (error) => ({ ok: false, error });
   if (!(imgW > 0 && imgH > 0)) return fail('Choose an image first.');
   if (!(value > 0)) return fail(mode === 'across' ? 'Enter how many pages across.' : 'Enter a poster size.');
-  if (!(margin >= 0) || !(overlap >= 0)) return fail('Margin and overlap cannot be negative.');
+  if (Number.isNaN(margin) || Number.isNaN(overlap)) return fail('Enter a number for the margin and the overlap.');
+  if (margin < 0 || overlap < 0) return fail('Margin and overlap cannot be negative.');
   const page = pageSize(paper, orientation);
   const printW = page.w - 2 * margin;
   const printH = page.h - 2 * margin;
@@ -76,7 +79,7 @@ export function layout(opts) {
   }
   const cols = count(posterW, printW, stepX);
   const rows = count(posterH, printH, stepY);
-  if (cols * rows > MAX_SHEETS) return fail(`That needs ${cols * rows} sheets. The limit is ${MAX_SHEETS}. Choose a smaller poster.`);
+  if (cols * rows > MAX_SHEETS) return fail(`That needs more than ${MAX_SHEETS} sheets, which is the limit. Choose a smaller poster.`);
 
   const lastColFill = cols > 1 ? (posterW - (cols - 1) * stepX) / printW : 1;
   const lastRowFill = rows > 1 ? (posterH - (rows - 1) * stepY) / printH : 1;
@@ -93,17 +96,28 @@ export function layout(opts) {
 // Top-left corner of a tile in poster space (inches, y down).
 export const tileOrigin = (L, c, r) => ({ x: c * L.stepX, y: r * L.stepY });
 
-// Tip when the last column or row only holds a thin strip of the poster.
+// Tips when the last column or row only holds a thin strip of the poster.
+// Each tip: { text, fix } where fix = { mode: 'width' | 'height', inches } is a poster size that drops that column or row.
+// The strip includes the overlap, so the poster only needs to shrink by (strip - overlap).
 export function wasteTip(L, unit = 'in') {
   const tips = [];
-  const fmt = (v) => `${Math.round(fromInches(v, unit) * 10) / 10} ${unit}`;
+  const fmt = (v) => `${Math.ceil(fromInches(v, unit) * 10 - 1e-9) / 10} ${unit}`;
+  const sheets = (n) => `${n} ${n === 1 ? 'sheet' : 'sheets'}`;
   if (L.cols > 1 && L.lastColFill < 0.2) {
     const strip = L.posterW - (L.cols - 1) * L.stepX;
-    tips.push(`The last column holds only a ${fmt(strip)} strip. Make the poster ${fmt(strip)} narrower to save ${L.rows} sheets.`);
+    const cut = strip - L.overlap;
+    tips.push({
+      text: `The last column holds only a ${fmt(strip)} strip. Make the poster ${fmt(cut)} narrower to save ${sheets(L.rows)}.`,
+      fix: { mode: 'width', inches: L.posterW - cut },
+    });
   }
   if (L.rows > 1 && L.lastRowFill < 0.2) {
     const strip = L.posterH - (L.rows - 1) * L.stepY;
-    tips.push(`The last row holds only a ${fmt(strip)} strip. Make the poster ${fmt(strip)} shorter to save ${L.cols} sheets.`);
+    const cut = strip - L.overlap;
+    tips.push({
+      text: `The last row holds only a ${fmt(strip)} strip. Make the poster ${fmt(cut)} shorter to save ${sheets(L.cols)}.`,
+      fix: { mode: 'height', inches: L.posterH - cut },
+    });
   }
   return tips;
 }

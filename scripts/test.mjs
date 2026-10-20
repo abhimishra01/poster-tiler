@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import * as lib from 'pdf-lib';
+import zlib from 'node:zlib';
 import * as t from '../src/lib/tile.js';
 import { buildPdf } from '../src/lib/pdf.js';
 
@@ -45,6 +46,11 @@ assert.equal(t.layout({ ...base, overlap: 9 }).ok, false);
 assert.equal(t.layout({ ...base, margin: 5 }).ok, false);
 assert.equal(t.layout({ ...base, mode: 'width', value: 2000 }).ok, false); // too many sheets
 assert.equal(t.layout({ ...base, value: 0 }).ok, false);
+// A blank margin or overlap field is not "negative"
+assert.match(t.layout({ ...base, margin: NaN }).error, /Enter a number/);
+assert.match(t.layout({ ...base, overlap: NaN }).error, /Enter a number/);
+assert.match(t.layout({ ...base, margin: -1 }).error, /negative/);
+assert.doesNotMatch(t.layout({ ...base, mode: 'width', value: 1e15 }).error, /\d{6}/);
 
 // Labels: row letter, column number
 assert.equal(t.tileLabel(0, 0), 'A1');
@@ -69,6 +75,25 @@ assert.equal(t.describeQuality(40).level, 'low');
 L = t.layout({ ...base, imgW: 1000, imgH: 1000, mode: 'width', value: 8.5 });
 assert.equal(L.cols, 2);
 assert.ok(t.wasteTip(L).length >= 1);
+// Tip says how much to cut: the strip minus the overlap. 23.3 in wide gives a 0.8 in strip, so 0.3 in is enough.
+L = t.layout({ ...base, imgW: 1000, imgH: 1000, mode: 'width', value: 23.3 });
+assert.equal(L.cols, 4);
+let tip = t.wasteTip(L)[0];
+assert.match(tip.text, /0\.8 in strip/);
+assert.match(tip.text, /0\.3 in narrower to save \d+ sheets?\./);
+// Applying the fix really drops a column
+near(tip.fix.inches, 23, 0.001);
+assert.equal(tip.fix.mode, 'width');
+assert.equal(t.layout({ ...base, imgW: 1000, imgH: 1000, mode: 'width', value: tip.fix.inches }).cols, 3);
+// Singular: one row of pages saves "1 sheet", not "1 sheets"
+L = t.layout({ ...base, imgW: 1000, imgH: 1000, mode: 'width', value: 23.3, orientation: 'portrait' });
+L = { ...L, rows: 1 };
+assert.match(t.wasteTip(L)[0].text, /to save 1 sheet\./);
+// Unit switch never drifts: the stored inches stay, only the display changes
+const stored = 0.125;
+assert.equal(t.showLen(stored, 'cm'), 0.32);
+assert.equal(t.showLen(stored, 'in'), 0.13);
+near(t.toInches(2.54, 'cm'), 1);
 assert.equal(t.wasteTip(t.layout(base)).length, 0);
 
 // PDF: 6 tiles + 1 map page, right page size, bytes start with %PDF
@@ -88,5 +113,40 @@ assert.equal((await lib.PDFDocument.load(bytes2)).getPageCount(), 6);
 const L0 = t.layout({ ...base, margin: 0 });
 const bytes3 = await buildPdf(lib, L0, { bytes: png, type: 'png' }, { marks: true, labels: true, map: false });
 assert.equal((await lib.PDFDocument.load(bytes3)).getPageCount(), L0.sheets);
+
+
+// PDF placement: read the content stream of each page and check where the picture is drawn.
+function content(page) {
+  const refs = page.node.Contents();
+  const parts = (refs.asArray ? refs.asArray() : [refs]).map((r) => page.doc.context.lookup(r));
+  return parts.map((p) => Buffer.from(zlib.inflateSync(Buffer.from(p.getContents()))).toString('latin1')).join('\n');
+}
+const Lp = t.layout({ ...base, imgW: 2000, imgH: 2000, mode: 'width', value: 15.5 }); // 2 x 2 on Letter, poster 15.5 in square
+assert.equal(Lp.cols, 2); assert.equal(Lp.rows, 2);
+const bp = await buildPdf(lib, Lp, { bytes: png, type: 'png' }, { marks: true, labels: true, map: false });
+const dp = await lib.PDFDocument.load(bp);
+const pt = (v) => v * 72;
+for (const [i, [c, r]] of [[0, 0], [1, 0], [0, 1], [1, 1]].entries()) {
+  const txt = content(dp.getPage(i));
+  const o = t.tileOrigin(Lp, c, r);
+  // clip box = printable area
+  const clip = txt.match(/([\d.-]+) ([\d.-]+) ([\d.-]+) ([\d.-]+) re\s+W/);
+  assert.ok(clip, 'clip rectangle');
+  near(+clip[1], pt(0.25), 0.1); near(+clip[2], pt(0.25), 0.1);
+  near(+clip[3], pt(Lp.printW), 0.1); near(+clip[4], pt(Lp.printH), 0.1);
+  // picture matrix: width and height of the whole poster, shifted so tile (c, r) sits in the box
+  const tr = [...txt.matchAll(/1 0 0 1 ([\d.-]+) ([\d.-]+) cm/g)].find((x) => +x[1] !== 0 || +x[2] !== 0) || [0, '0', '0'];
+  const sc = [...txt.matchAll(/([\d.-]+) 0 0 ([\d.-]+) 0 0 cm/g)].find((x) => +x[1] > 1);
+  assert.ok(tr && sc, 'image matrix');
+  near(+sc[1], pt(Lp.posterW), 0.1); near(+sc[2], pt(Lp.posterH), 0.1);
+  near(+tr[1], pt(0.25) - pt(o.x), 0.1);
+  near(+tr[2], 792 - pt(0.25) - pt(Lp.posterH - o.y), 0.1);
+}
+// Zero margin: the label sits in the bottom right corner of the box, not on top of the picture's top left
+const bz = await buildPdf(lib, L0, { bytes: png, type: 'png' }, { marks: false, labels: true, map: false });
+const tz = content((await lib.PDFDocument.load(bz)).getPage(0));
+const td = tz.match(/1 0 0 1 ([\d.-]+) ([\d.-]+) Tm/);
+assert.ok(td, 'label position');
+assert.ok(+td[1] > 612 * 0.7 && +td[2] < 792 * 0.2, 'label is near the bottom right');
 
 console.log('All tests passed');

@@ -1,12 +1,12 @@
 // Builds the multi-page PDF. Runs in the browser; also runs in Node for tests.
 // `lib` is the pdf-lib module. `image` is { bytes, type: 'jpg' | 'png' }.
-import { tileLabel, tileOrigin } from './tile.js';
+import { tileLabel, tileOrigin, showLen } from './tile.js';
 
 const PT = 72;
 
 export async function buildPdf(lib, L, image, opts = {}, onProgress = () => {}) {
   const { PDFDocument, StandardFonts, rgb, pushGraphicsState, popGraphicsState, rectangle, clip, endPath } = lib;
-  const { marks = true, labels = true, map = false } = opts;
+  const { marks = true, labels = true, map = false, unit = 'in' } = opts;
   const doc = await PDFDocument.create();
   doc.setTitle('Poster tiles');
   doc.setProducer('printlargeposter.com');
@@ -42,19 +42,22 @@ export async function buildPdf(lib, L, image, opts = {}, onProgress = () => {}) 
           const size = Math.min(10, m * 0.55);
           page.drawText(text, { x: pw / 2 - font.widthOfTextAtSize(text, size) / 2, y: ph - m / 2 - size * 0.35, size, font: bold, color: black });
         } else {
+          // No room in the margin. Put the label in the bottom right corner of the picture box,
+          // the strip that the next page covers when you glue.
           const size = 11;
           const w = font.widthOfTextAtSize(text, size);
-          page.drawRectangle({ x: m + 3, y: ph - m - size - 7, width: w + 8, height: size + 6, color: rgb(1, 1, 1), opacity: 0.85 });
-          page.drawText(text, { x: m + 7, y: ph - m - size - 4, size, font: bold, color: black });
+          const x0 = pw - m - w - 11, y0 = m + 3;
+          page.drawRectangle({ x: x0, y: y0, width: w + 8, height: size + 6, color: rgb(1, 1, 1), opacity: 0.85 });
+          page.drawText(text, { x: x0 + 4, y: y0 + 5, size, font: bold, color: black });
         }
       }
       done++;
       onProgress(done, total);
-      if (typeof setTimeout === 'function') await new Promise((res) => setTimeout(res, 0));
+      await new Promise((res) => setTimeout(res, 0));
     }
   }
   if (map) {
-    drawMap(doc, L, font, bold, rgb);
+    drawMap(doc, L, font, bold, rgb, unit);
     done++;
     onProgress(done, total);
   }
@@ -77,12 +80,12 @@ function drawMarks(page, L, c, r, m, pw, ph, t, color) {
   line(left, bottom, left - t, bottom, glueBottom); line(right, bottom, right + t, bottom, glueBottom);
 }
 
-function drawMap(doc, L, font, bold, rgb) {
+function drawMap(doc, L, font, bold, rgb, unit) {
   const page = doc.addPage([L.page.w * PT, L.page.h * PT]);
   const pw = L.page.w * PT, ph = L.page.h * PT;
   const ink = rgb(0.1, 0.1, 0.12);
   page.drawText('Assembly map', { x: 40, y: ph - 56, size: 22, font: bold, color: ink });
-  page.drawText(`${L.cols} pages across, ${L.rows} down. Poster size ${L.posterW.toFixed(1)} x ${L.posterH.toFixed(1)} in.`, { x: 40, y: ph - 76, size: 11, font, color: ink });
+  page.drawText(`${L.cols} pages across, ${L.rows} down. Poster size ${showLen(L.posterW, unit, 1)} x ${showLen(L.posterH, unit, 1)} ${unit}.`, { x: 40, y: ph - 76, size: 11, font, color: ink });
   const notes = [
     'Print at 100% or Actual size. Do not use Fit to page.',
     'Trim the white margin along the solid marks. Leave the dashed edges uncut.',
