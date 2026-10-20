@@ -82,3 +82,6 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .data-table th, .data-table td { text-align:left; padding:.6rem .75rem; border-bottom:1px solid var(--line); }
 .data-table thead th { font-size:.8125rem; color:var(--muted); font-weight:650; border-bottom:2px solid var(--line); }
 .data-table tbody th { font-weight:650; }
+
+#file:focus-visible + #file-btn { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+@media (max-width: 420px) { .stat dd { font-size: .875rem; } }

@@ -5,8 +5,8 @@ import { PAPER } from '../lib/tile.js';
   <!-- 1. Image -->
   <div class="rounded-2xl border border-line bg-card p-4 lg:col-start-1">
     <p class="field-label" id="img-h">1. Your image</p>
-    <input id="file" type="file" accept="image/*" class="sr-only" aria-labelledby="img-h" />
-    <label for="file" class="btn-ghost" id="file-btn" tabindex="0">
+    <input id="file" type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/bmp,image/avif" class="sr-only" aria-labelledby="img-h" />
+    <label for="file" class="btn-ghost" id="file-btn">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
       Choose an image
     </label>
@@ -18,11 +18,16 @@ import { PAPER } from '../lib/tile.js';
     <div id="preview" class="relative h-[19rem] overflow-hidden rounded-xl border border-line bg-paper sm:h-[30rem]" role="img" aria-label="Preview of the poster split into pages" aria-describedby="summary">
       <div id="preview-inner" class="absolute inset-0 p-2"></div>
     </div>
+    <p class="mt-2 text-xs text-muted">Hatched area is blank paper. A shaded strip is overlap you glue. A1, A2 and so on are the page names.</p>
     <dl id="stats" class="mt-3 grid grid-cols-3 gap-2" aria-label="Poster summary">
       <div class="stat"><dt>Sheets</dt><dd id="st-sheets">&nbsp;</dd></div>
       <div class="stat"><dt>Poster size</dt><dd id="st-size">&nbsp;</dd></div>
       <div class="stat"><dt>Print quality</dt><dd id="st-quality">&nbsp;</dd></div>
     </dl>
+    <div class="mt-3 hidden lg:block">
+      <button type="button" class="btn-primary dl-btn" disabled>Download PDF</button>
+      <p role="status" class="dl-status mt-2 text-sm font-semibold text-ink">Print at 100% (Actual size). Do not choose Fit to page.</p>
+    </div>
     <div id="summary" aria-live="polite" aria-atomic="true" class="mt-3 min-h-[4.5rem] text-sm text-muted"></div>
   </div>
 
@@ -44,7 +49,7 @@ import { PAPER } from '../lib/tile.js';
       <p class="field-label">3. Poster size</p>
       <fieldset class="seg">
         <legend class="sr-only">Set the poster size by</legend>
-        <label><input type="radio" name="mode" value="across" checked /><span>Pages across</span></label>
+        <label><input type="radio" name="mode" value="across" checked /><span>Across</span></label>
         <label><input type="radio" name="mode" value="width" /><span>Width</span></label>
         <label><input type="radio" name="mode" value="height" /><span>Height</span></label>
       </fieldset>
@@ -67,7 +72,7 @@ import { PAPER } from '../lib/tile.js';
         <input id="margin" class="field tabular-nums" type="number" inputmode="decimal" min="0" step="0.05" value="0.25" />
       </div>
       <div>
-        <label for="overlap" class="field-label">Overlap (<span class="unit-name">in</span>)</label>
+        <label for="overlap" class="field-label">Overlap, glue strip (<span class="unit-name">in</span>)</label>
         <input id="overlap" class="field tabular-nums" type="number" inputmode="decimal" min="0" step="0.05" value="0.5" />
       </div>
     </div>
@@ -80,42 +85,57 @@ import { PAPER } from '../lib/tile.js';
     </div>
   </div>
 
-  <!-- 3. Download -->
-  <div class="rounded-2xl border border-line bg-card p-4 lg:col-start-1">
-    <button type="button" id="download" class="btn-primary" disabled>Download PDF</button>
-    <p id="dl-status" role="status" aria-live="polite" class="mt-2 min-h-[2.5rem] text-sm text-muted">Print at 100% or Actual size. Do not choose Fit to page.</p>
+  <!-- Download bar on phones. It stays at the bottom of the screen while you change settings. -->
+  <div class="sticky bottom-2 z-10 rounded-2xl border border-line bg-card p-3 shadow-lg lg:hidden">
+    <button type="button" class="btn-primary dl-btn" disabled>Download PDF</button>
+    <p role="status" class="dl-status mt-2 text-sm font-semibold text-ink">Print at 100% (Actual size). Do not choose Fit to page.</p>
   </div>
   <noscript><p class="rounded-xl border border-line bg-card p-4">This tool needs JavaScript. Turn it on to split your image into pages.</p></noscript>
 </section>
 
 <script>
-  import { layout, wasteTip, fromInches, tileLabel, tileOrigin } from '../lib/tile.js';
+  import { layout, wasteTip, showLen, toInches, tileLabel, tileOrigin } from '../lib/tile.js';
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+  const all = (sel: string) => Array.from(document.querySelectorAll<HTMLElement>(sel));
   const radio = (name: string) => (document.querySelector(`input[name="${name}"]:checked`) as HTMLInputElement).value;
-  const round = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
 
-  type Src = { blob: Blob; url: string; w: number; h: number; name: string; sample: boolean };
+  type Src = { blob: Blob; url: string; w: number; h: number; sample: boolean };
   let src: Src | null = null;
   let current: any = null;
+  let tips: { text: string; fix: { mode: 'width' | 'height'; inches: number } }[] = [];
   let busy = false;
+  let statusKind: 'note' | 'invalid' | 'failed' | 'progress' | 'done' = 'note';
+  const NOTE = 'Print at 100% (Actual size). Do not choose Fit to page.';
 
-  // Values stay in the unit on screen. Width and height keep their own values per mode.
+  // Every length is stored in inches. The unit only changes what is shown, so switching units never drifts.
   const vals = { across: 3, width: 24, height: 36 };
+  let marginIn = 0.25;
+  let overlapIn = 0.5;
   let unit: 'in' | 'cm' = 'in';
 
   const sizeInput = $<HTMLInputElement>('size');
   const marginInput = $<HTMLInputElement>('margin');
   const overlapInput = $<HTMLInputElement>('overlap');
   const mode = () => radio('mode') as 'across' | 'width' | 'height';
+  // Step of the plus and minus buttons, in the unit on screen.
+  const stepFor = (m: string) => (m === 'across' || unit === 'in' ? 1 : 2);
 
-  function syncSizeInput() {
+  function syncInputs() {
     const m = mode();
-    sizeInput.value = String(vals[m]);
-    sizeInput.step = m === 'across' ? '1' : unit === 'in' ? '1' : '2';
-    $('size-label').textContent = m === 'across' ? 'Pages across' : (m === 'width' ? 'Poster width' : 'Poster height') + ` (${unit === 'in' ? 'inches' : 'centimeters'})`;
-    document.querySelectorAll('.unit-name').forEach((e) => (e.textContent = unit));
+    sizeInput.value = String(m === 'across' ? vals.across : showLen(vals[m], unit));
+    sizeInput.step = String(stepFor(m));
+    const unitWord = unit === 'in' ? 'inches' : 'centimeters';
+    $('size-label').textContent = m === 'across' ? 'Pages across' : `${m === 'width' ? 'Poster width' : 'Poster height'} (${unitWord})`;
+    all('.unit-name').forEach((e) => (e.textContent = unit));
     marginInput.step = overlapInput.step = unit === 'in' ? '0.05' : '0.1';
+    marginInput.value = String(showLen(marginIn, unit));
+    overlapInput.value = String(showLen(overlapIn, unit));
+  }
+
+  function setStatus(text: string, kind: typeof statusKind) {
+    statusKind = kind;
+    all('.dl-status').forEach((e) => { e.textContent = text; });
   }
 
   /* ---------- Preview ---------- */
@@ -147,63 +167,77 @@ import { PAPER } from '../lib/tile.js';
 
   /* ---------- Summary ---------- */
   function update() {
-    const dl = $<HTMLButtonElement>('download');
     const sum = $('summary');
     if (!src) return;
     const L = layout({
       imgW: src.w, imgH: src.h, paper: ($('paper') as HTMLSelectElement).value, orientation: radio('orient'),
-      mode: mode(), value: vals[mode()], unit, margin: parseFloat(marginInput.value), overlap: parseFloat(overlapInput.value),
+      mode: mode(), value: vals[mode()], unit: 'in', margin: marginIn, overlap: overlapIn,
     });
     current = L;
+    const dls = all('.dl-btn') as HTMLButtonElement[];
+    $('preview').classList.toggle('opacity-40', !L.ok);
     if (!L.ok) {
+      // Clear the numbers so old values do not sit beside an error.
+      ['st-sheets', 'st-size', 'st-quality'].forEach((id) => { $(id).textContent = '-'; });
+      tips = [];
       sum.textContent = L.error;
       sum.className = 'mt-3 min-h-[4.5rem] text-sm font-medium text-brand-ink';
-      dl.disabled = true;
+      dls.forEach((b) => { b.disabled = true; });
+      if (!busy) setStatus(L.error, 'invalid');
       return;
     }
+    if (statusKind === 'invalid') setStatus(NOTE, 'note');
     sum.className = 'mt-3 min-h-[4.5rem] text-sm text-muted';
-    const f = (v: number) => round(fromInches(v, unit), 1);
+    const f = (v: number) => showLen(v, unit, 1);
     $('st-sheets').textContent = `${L.sheets} (${L.cols} × ${L.rows})`;
     $('st-size').textContent = `${f(L.posterW)} × ${f(L.posterH)} ${unit}`;
     $('st-quality').textContent = `${Math.round(L.dpi)} dpi, ${L.quality.level}`;
+    tips = wasteTip(L, unit);
     const lines = [
-      `${L.cols} pages across and ${L.rows} down. Each page prints ${f(L.printW)} × ${f(L.printH)} ${unit} of the picture.`,
-      `At ${Math.round(L.dpi)} dpi the poster looks ${L.quality.text}.`,
-      ...wasteTip(L, unit),
+      `<p class="mb-1">${L.cols} pages across and ${L.rows} down. Each page prints ${f(L.printW)} × ${f(L.printH)} ${unit} of the picture.</p>`,
+      `<p class="mb-1">At ${Math.round(L.dpi)} dpi the poster looks ${L.quality.text}.${L.dpi < 120 ? ` This image gives 150 dpi up to ${f(src.w / 150)} ${unit} wide.` : ''}</p>`,
+      ...tips.map((t, i) => `<p class="mb-1">${t.text} <button type="button" class="font-semibold text-brand-ink underline underline-offset-4" data-fix="${i}">Apply</button></p>`),
     ];
-    sum.innerHTML = lines.map((t) => `<p class="mb-1">${t}</p>`).join('');
+    sum.innerHTML = lines.join('');
     if (!busy) {
-      dl.disabled = false;
       const pages = L.sheets + (($('opt-map') as HTMLInputElement).checked ? 1 : 0);
-      dl.textContent = `Download PDF (${pages} ${pages === 1 ? 'page' : 'pages'})`;
+      dls.forEach((b) => {
+        b.disabled = false;
+        b.textContent = `Download ${src!.sample ? 'sample ' : ''}PDF (${pages} ${pages === 1 ? 'page' : 'pages'})`;
+      });
     }
     renderPreview();
   }
 
+  $('summary').addEventListener('click', (e) => {
+    const b = (e.target as HTMLElement).closest('[data-fix]') as HTMLElement | null;
+    const t = b && tips[Number(b.dataset.fix)];
+    if (!t) return;
+    // Round down to a tenth in the shown unit so the new size really drops the thin column or row.
+    const shown = Math.floor(showLen(t.fix.inches, unit, 4) * 10 + 1e-6) / 10;
+    vals[t.fix.mode] = toInches(shown, unit);
+    (document.querySelector(`input[name="mode"][value="${t.fix.mode}"]`) as HTMLInputElement).checked = true;
+    syncInputs(); update();
+  });
+
   /* ---------- Image loading ---------- */
-  async function decode(blob: Blob): Promise<{ w: number; h: number }> {
-    try {
-      const bmp = await createImageBitmap(blob);
-      const r = { w: bmp.width, h: bmp.height };
-      bmp.close();
-      return r;
-    } catch {
-      return new Promise((res, rej) => {
-        const u = URL.createObjectURL(blob);
-        const im = new Image();
-        im.onload = () => { res({ w: im.naturalWidth, h: im.naturalHeight }); URL.revokeObjectURL(u); };
-        im.onerror = () => { rej(new Error('decode')); URL.revokeObjectURL(u); };
-        im.src = u;
-      });
-    }
+  // Phone photos carry a rotation flag. Ask for it explicitly; older browsers fall back to the default.
+  async function bitmapOf(blob: Blob): Promise<ImageBitmap> {
+    try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); } catch { return createImageBitmap(blob); }
   }
 
   async function setSource(blob: Blob, name: string, sample = false) {
+    if (blob.type === 'image/svg+xml' || (blob.type && !blob.type.startsWith('image/'))) {
+      $('img-name').textContent = 'Use a JPG, PNG or WebP image.';
+      return;
+    }
     try {
-      const { w, h } = await decode(blob);
+      const bmp = await bitmapOf(blob);
+      const { width: w, height: h } = bmp;
+      bmp.close();
       if (!w || !h) throw new Error('size');
       if (src) URL.revokeObjectURL(src.url);
-      src = { blob, url: URL.createObjectURL(blob), w, h, name, sample };
+      src = { blob, url: URL.createObjectURL(blob), w, h, sample };
       $('img-name').textContent = sample
         ? 'Sample picture shown. Choose your own image to replace it.'
         : `${name}, ${w} × ${h} pixels. It stays on your device.`;
@@ -234,49 +268,60 @@ import { PAPER } from '../lib/tile.js';
 
   const fileInput = $<HTMLInputElement>('file');
   fileInput.addEventListener('change', () => { const f = fileInput.files?.[0]; if (f) setSource(f, f.name); });
-  $('file-btn').addEventListener('keydown', (e) => { const k = (e as KeyboardEvent).key; if (k === 'Enter' || k === ' ') { e.preventDefault(); fileInput.click(); } });
+  // A file dropped anywhere on the page loads here. Without this the browser would open the file and leave the tool.
   const drop = $('drop');
-  ['dragenter', 'dragover'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('ring-2', 'ring-brand'); }));
-  ['dragleave', 'drop'].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove('ring-2', 'ring-brand'); }));
-  drop.addEventListener('drop', (e) => { const f = (e as DragEvent).dataTransfer?.files?.[0]; if (f && f.type.startsWith('image/')) setSource(f, f.name); });
+  ['dragenter', 'dragover'].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('ring-2', 'ring-brand'); }));
+  document.addEventListener('dragleave', (e) => { if (!(e as DragEvent).relatedTarget) drop.classList.remove('ring-2', 'ring-brand'); });
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    drop.classList.remove('ring-2', 'ring-brand');
+    const f = (e as DragEvent).dataTransfer?.files?.[0];
+    if (f) setSource(f, f.name);
+  });
   document.addEventListener('paste', (e) => {
     const f = Array.from(e.clipboardData?.files || []).find((x) => x.type.startsWith('image/'));
     if (f) setSource(f, f.name || 'Pasted image');
   });
 
   /* ---------- Settings ---------- */
-  sizeInput.addEventListener('input', () => { const v = parseFloat(sizeInput.value); vals[mode()] = isNaN(v) ? 0 : v; update(); });
-  const nudge = (d: number) => {
+  sizeInput.addEventListener('input', () => {
+    const v = parseFloat(sizeInput.value);
     const m = mode();
-    const step = m === 'across' ? 1 : unit === 'in' ? 1 : 2;
-    vals[m] = Math.max(step, round((vals[m] || 0) + d * step, 2));
-    sizeInput.value = String(vals[m]);
+    // Whole pages only for "pages across".
+    vals[m] = isNaN(v) ? 0 : m === 'across' ? Math.round(v) : toInches(v, unit);
     update();
+  });
+  sizeInput.addEventListener('change', syncInputs); // show the value that was used, for example 1.5 becomes 2
+  const nudge = (d: number) => {
+    const m = mode(), step = stepFor(m);
+    if (m === 'across') vals.across = Math.max(1, (vals.across || 0) + d);
+    else vals[m] = toInches(Math.max(step, showLen(vals[m] || 0, unit) + d * step), unit);
+    syncInputs(); update();
   };
   $('size-minus').addEventListener('click', () => nudge(-1));
   $('size-plus').addEventListener('click', () => nudge(1));
-  document.querySelectorAll('input[name="mode"]').forEach((e) => e.addEventListener('change', () => { syncSizeInput(); update(); }));
-  document.querySelectorAll('input[name="unit"]').forEach((e) => e.addEventListener('change', () => {
-    const next = radio('unit') as 'in' | 'cm';
-    if (next === unit) return;
-    const k = next === 'cm' ? 2.54 : 1 / 2.54;
-    vals.width = round(vals.width * k, 1); vals.height = round(vals.height * k, 1);
-    marginInput.value = String(round(parseFloat(marginInput.value || '0') * k));
-    overlapInput.value = String(round(parseFloat(overlapInput.value || '0') * k));
-    unit = next;
-    syncSizeInput(); update();
+  all('input[name="mode"]').forEach((e) => e.addEventListener('change', () => { syncInputs(); update(); }));
+  all('input[name="unit"]').forEach((e) => e.addEventListener('change', () => {
+    unit = radio('unit') as 'in' | 'cm';
+    syncInputs(); update();
   }));
-  ['paper', 'margin', 'overlap', 'opt-map'].forEach((id) => $(id).addEventListener('input', update));
-  document.querySelectorAll('input[name="orient"]').forEach((e) => e.addEventListener('change', update));
+  marginInput.addEventListener('input', () => { const v = parseFloat(marginInput.value); marginIn = isNaN(v) ? NaN : toInches(v, unit); update(); });
+  overlapInput.addEventListener('input', () => { const v = parseFloat(overlapInput.value); overlapIn = isNaN(v) ? NaN : toInches(v, unit); update(); });
+  ['paper', 'opt-map'].forEach((id) => $(id).addEventListener('input', update));
+  all('input[name="orient"]').forEach((e) => e.addEventListener('change', update));
 
   /* ---------- PDF ---------- */
   const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+  // Canvas limits: iOS Safari allows about 16 million pixels, other browsers about 64 million and 10000 px per side.
+  const MAX_SIDE = isIOS ? 4096 : 10000;
+  const MAX_PIXELS = isIOS ? 16e6 : 64e6;
+  const MAX_DPI = 200; // above this a home printer shows no gain, and the PDF only gets heavier
+  const JPEG_QUALITY = 0.92;
+
   async function prepareJpeg(blob: Blob, posterIn: number): Promise<Uint8Array> {
-    const bmp = await createImageBitmap(blob);
-    const maxSide = isIOS ? 4096 : 10000;
-    const maxPix = isIOS ? 16e6 : 64e6;
-    let scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height), Math.sqrt(maxPix / (bmp.width * bmp.height)), (300 * posterIn) / bmp.width);
+    const bmp = await bitmapOf(blob);
+    let scale = Math.min(1, MAX_SIDE / Math.max(bmp.width, bmp.height), Math.sqrt(MAX_PIXELS / (bmp.width * bmp.height)), (MAX_DPI * posterIn) / bmp.width);
     for (let attempt = 0; attempt < 5; attempt++) {
       const c = document.createElement('canvas');
       c.width = Math.max(1, Math.round(bmp.width * scale));
@@ -286,20 +331,20 @@ import { PAPER } from '../lib/tile.js';
         g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
         g.imageSmoothingQuality = 'high';
         g.drawImage(bmp, 0, 0, c.width, c.height);
-        const out: Blob | null = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.92));
+        const out: Blob | null = await new Promise((res) => c.toBlob(res, 'image/jpeg', JPEG_QUALITY));
         if (out && out.size > 0) { bmp.close(); return new Uint8Array(await out.arrayBuffer()); }
       }
-      scale *= 0.7;
+      scale *= 0.7; // the browser refused the canvas, so try a smaller one
     }
     bmp.close();
     throw new Error('canvas');
   }
 
-  $('download').addEventListener('click', async () => {
+  async function download() {
     if (!src || !current || !current.ok || busy) return;
-    const L = current, btn = $<HTMLButtonElement>('download'), status = $('dl-status');
-    busy = true; btn.disabled = true; btn.textContent = 'Building PDF...';
-    status.textContent = 'Preparing your image...';
+    const L = current, btns = all('.dl-btn') as HTMLButtonElement[];
+    busy = true; btns.forEach((b) => { b.disabled = true; b.textContent = 'Building PDF...'; });
+    setStatus('Preparing your image...', 'progress');
     try {
       const [lib, { buildPdf }] = await Promise.all([import('pdf-lib'), import('../lib/pdf.js')]);
       const jpg = await prepareJpeg(src.blob, L.posterW);
@@ -307,21 +352,23 @@ import { PAPER } from '../lib/tile.js';
         marks: ($('opt-marks') as HTMLInputElement).checked,
         labels: ($('opt-labels') as HTMLInputElement).checked,
         map: ($('opt-map') as HTMLInputElement).checked,
-      }, (d: number, t: number) => { status.textContent = `Building page ${d} of ${t}...`; });
+        unit,
+      }, (d: number, t: number) => setStatus(`Building page ${d} of ${t}...`, 'progress'));
       const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url; a.download = `poster-${L.cols}x${L.rows}-pages.pdf`;
       document.body.appendChild(a); a.click(); a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 60000);
-      status.textContent = 'Done. Open the PDF and print at 100% or Actual size. Do not choose Fit to page.';
+      setStatus('Done. Open the PDF and print at 100% (Actual size). Do not choose Fit to page.', 'done');
     } catch {
-      status.textContent = 'The PDF could not be built. Try a smaller image or a smaller poster.';
+      setStatus('The PDF could not be built. Try a smaller image or a smaller poster.', 'failed');
     } finally {
-      busy = false; btn.disabled = false; update();
+      busy = false; update();
     }
-  });
+  }
+  all('.dl-btn').forEach((b) => b.addEventListener('click', download));
 
   /* ---------- Start ---------- */
-  syncSizeInput();
+  syncInputs();
   makeSample().then((b) => setSource(b, 'Sample', true));
 </script>
