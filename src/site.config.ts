@@ -14,7 +14,8 @@ export default {
   email: 'hello@printlargeposter.com',       // contact email (shown on Contact and Privacy pages)
   ga4: '',                            // GA4 measurement ID, e.g. 'G-XXXXXXXXXX'. Empty = Google Analytics off
   adsense: '',                        // AdSense publisher ID, e.g. 'ca-pub-1234567890123456'. Empty = ads off
-  brand: '#b8431d',                   // brand color (hex)
+  brand: '#a21caf',                   // brand color (hex)
+  skin: 'retro',                      // visual skin: minimal, swiss, clay or retro
   locale: 'en-US',                    // BCP 47 language tag
   ogImage: '/og.png',                        // e.g. '/og.png' (1200x630 file in public/). Empty = no image
   category: 'UtilitiesApplication',   // schema.org applicationCategory

@@ -1,0 +1,70 @@
+/* Skin: Retro print. Cream paper, 2px ink borders, hard offset shadows, slab headings, faint halftone.
+   Tokens first, then surface rules. Switched by data-skin="retro" on <html>. */
+:root[data-skin="retro"] {
+  --paper: #f1e6d2;
+  --card: #fbf4e6;
+  --ink: #241c17;
+  --muted: #5e4f44;
+  --line: #cdbda3;          /* hairlines, decoration only */
+  --edge: #241c17;          /* input and button edges (WCAG 1.4.11) */
+  --fill: #fffaf0;          /* input fill */
+  --shadow-ink: #241c17;
+  --dots: rgb(36 28 23 / .07);
+  --brand-ink: color-mix(in oklab, var(--brand) 85%, black);
+  --brand-soft: color-mix(in oklab, var(--brand) 14%, #fbf4e6);
+  --font-slab: Rockwell, "Roboto Slab", "Rockwell Nova", Clarendon, Georgia, serif;
+}
+:root[data-skin="retro"][data-theme="dark"] {
+  --paper: #1b1512;
+  --card: #261e19;
+  --ink: #f1e6d2;
+  --muted: #c2b2a2;
+  --line: #43362d;
+  --edge: #f1e6d2;
+  --fill: #1f1814;
+  --shadow-ink: #000000;
+  --dots: rgb(241 230 210 / .05);
+  --brand-ink: color-mix(in oklab, var(--brand) 50%, white);
+  --brand-soft: color-mix(in oklab, var(--brand) 28%, #261e19);
+}
+:root[data-skin="retro"][data-theme] body { background: transparent; }
+:root[data-skin="retro"][data-theme] body::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; background-image: radial-gradient(var(--dots) 1px, transparent 1.4px); background-size: 6px 6px; }
+:root[data-skin="retro"][data-theme] :focus-visible { outline: 3px solid var(--brand-ink); outline-offset: 2px; }
+
+/* Header, hero, footer */
+:root[data-skin="retro"][data-theme] header { border-bottom: 2px solid var(--ink); background: var(--paper); backdrop-filter: none; }
+:root[data-skin="retro"][data-theme] header img { border: 2px solid var(--ink); border-radius: 50%; }
+:root[data-skin="retro"][data-theme] header a:first-child { font-family: var(--font-slab); }
+:root[data-skin="retro"][data-theme] header nav a[aria-current="page"] { background: none; box-shadow: inset 0 -3px 0 var(--brand-ink); border-radius: 0; }
+:root[data-skin="retro"][data-theme] #theme-toggle { border: 2px solid var(--edge); background: var(--card); box-shadow: 2px 2px 0 var(--shadow-ink); }
+:root[data-skin="retro"][data-theme] main > section:first-child > p:first-child { border: 2px solid var(--ink); background: var(--card); color: var(--ink); text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; font-weight: 700; }
+:root[data-skin="retro"][data-theme] main h1 { font-family: var(--font-slab); font-weight: 700; letter-spacing: -0.01em; line-height: 1.02; }
+:root[data-skin="retro"][data-theme] .prose-site h2, :root[data-skin="retro"][data-theme] #faq-h { font-family: var(--font-slab); font-weight: 700; letter-spacing: 0; }
+:root[data-skin="retro"][data-theme] footer { border-top: 2px solid var(--ink); }
+:root[data-skin="retro"][data-theme] .prose-site th, :root[data-skin="retro"][data-theme] .tbl thead th { background: var(--brand-soft); }
+:root[data-skin="retro"][data-theme] .prose-site th, :root[data-skin="retro"][data-theme] .prose-site td { border-bottom: 1px solid var(--line); }
+:root[data-skin="retro"][data-theme] #faq-h + div { border-color: var(--ink); }
+
+/* Poster tiler tool */
+:root[data-skin="retro"][data-theme] #tool > div:not(.hidden) { border: 2px solid var(--ink); border-radius: 14px; background: var(--card); box-shadow: 6px 6px 0 var(--shadow-ink); }
+:root[data-skin="retro"][data-theme] #tool > .sticky { box-shadow: 4px 4px 0 var(--shadow-ink); }
+:root[data-skin="retro"][data-theme] #preview { border: 2px solid var(--ink); border-radius: 10px; }
+:root[data-skin="retro"][data-theme] .field-label { text-transform: uppercase; letter-spacing: .08em; font-size: .75rem; font-weight: 700; font-family: var(--font-sans); }
+:root[data-skin="retro"][data-theme] .field { border: 2px solid var(--edge); border-radius: 8px; background: var(--fill); }
+:root[data-skin="retro"][data-theme] .field:focus { box-shadow: none; border-color: var(--edge); outline: 3px solid var(--brand-ink); outline-offset: 2px; }
+:root[data-skin="retro"][data-theme] .seg { border: 2px solid var(--edge); border-radius: 10px; background: var(--fill); }
+:root[data-skin="retro"][data-theme] .seg span { border-radius: 6px; }
+:root[data-skin="retro"][data-theme] .seg input:checked + span { background: var(--brand); color: #fff; box-shadow: none; }
+:root[data-skin="retro"][data-theme] .step-btn { border: 2px solid var(--edge); border-radius: 8px; background: var(--card); box-shadow: 3px 3px 0 var(--shadow-ink); }
+:root[data-skin="retro"][data-theme] .step-btn:active { transform: translate(3px, 3px); box-shadow: none; }
+:root[data-skin="retro"][data-theme] .btn-primary { border: 2px solid var(--ink); border-radius: 10px; box-shadow: 4px 4px 0 var(--shadow-ink); font-family: var(--font-slab); letter-spacing: .01em; }
+:root[data-skin="retro"][data-theme] .btn-primary:hover:not(:disabled) { filter: none; transform: translate(-1px, -1px); box-shadow: 5px 5px 0 var(--shadow-ink); }
+:root[data-skin="retro"][data-theme] .btn-primary:active:not(:disabled) { transform: translate(4px, 4px); box-shadow: none; }
+:root[data-skin="retro"][data-theme] .btn-primary:disabled { opacity: 1; background: var(--line); color: var(--muted); box-shadow: none; }
+:root[data-skin="retro"][data-theme] .btn-ghost { border: 2px dashed var(--edge); border-radius: 10px; background: var(--brand-soft); color: var(--ink); }
+:root[data-skin="retro"][data-theme] .stat { border: 2px solid var(--ink); border-radius: 10px; background: var(--card); }
+:root[data-skin="retro"][data-theme] .stat dd { font-family: var(--font-slab); color: var(--ink); font-size: 1.125rem; }
+:root[data-skin="retro"][data-theme] .stat:first-child { background: var(--brand); box-shadow: 3px 3px 0 var(--shadow-ink); color: #fff; }
+:root[data-skin="retro"][data-theme] .stat:first-child dt, :root[data-skin="retro"][data-theme] .stat:first-child dd { color: #fff; }
+:root[data-skin="retro"][data-theme] .stat:first-child dd { font-size: 1.75rem; line-height: 1.1; }
+:root[data-skin="retro"][data-theme] .data-table thead th { border-bottom-color: var(--ink); }
