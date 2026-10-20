@@ -5,8 +5,8 @@ import site from './src/site.config.ts';
 
 // GitHub Pages builds set PAGES_BASE (for example /poster-tiler/) and PAGES_SITE.
 export default defineConfig({
-  site: process.env.PAGES_SITE || `https://${site.domain}`,
-  base: process.env.PAGES_BASE || '/',
+  site: site.bingemind ? 'https://bingemind.com' : (process.env.PAGES_SITE || 'https://bingemind.com'),
+  base: site.bingemind ? '/poster-tiler/' : (process.env.PAGES_BASE || '/'),
   output: 'static',
   trailingSlash: 'always',
   compressHTML: true,

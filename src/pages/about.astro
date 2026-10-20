@@ -10,5 +10,5 @@ import { withBase } from '../lib/url.ts';
   <h2>How it works</h2>
   <p>You choose an image. The page works out the grid from your paper size, margin, overlap and poster size. The PDF is built inside your browser, so your picture never leaves your device.</p>
   <h2>Contact</h2>
-  <p>Questions or ideas? Write to <a href={`mailto:${site.email}`}>{site.email}</a> or visit the <a href={withBase('/contact/')}>Contact page</a>.</p>
+  <p>Questions or ideas? Write to <a href={site.contactHref}>{site.contactLabel}</a> or visit the <a href={withBase('/contact/')}>Contact page</a>.</p>
 </Page>

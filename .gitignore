@@ -6,3 +6,4 @@ tmp-*
 .wrangler
 .playwright-cli
 screenshots
+dist-bingemind/

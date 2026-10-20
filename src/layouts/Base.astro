@@ -13,7 +13,7 @@ const isPreview = withBase('') !== '/';
 const fullTitle = title ? `${title} | ${site.name}` : (site.title || `${site.name}: ${site.keyword} (${site.tagline})`);
 const base = `https://${site.domain}`;
 // Canonical always uses the real domain, even on a GitHub Pages build.
-const canonical = new URL(stripBase(Astro.url.pathname), base).href;
+const canonical = `${base}${stripBase(Astro.url.pathname)}`;
 // The share image must exist where the page is served, so it follows the build address.
 const image = site.ogImage ? new URL(withBase(site.ogImage), Astro.site).href : '';
 ---
@@ -31,7 +31,8 @@ const image = site.ogImage ? new URL(withBase(site.ogImage), Astro.site).href : 
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <meta name="theme-color" content={site.brand} />
-    {(noindex || isPreview) && <meta name="robots" content="noindex" />}
+    {(noindex || (isPreview && !site.bingemind)) && <meta name="robots" content="noindex" />}
+    {!noindex && (site.bingemind || !isPreview) && <meta name="robots" content="index,follow" />}
     <link rel="canonical" href={canonical} />
     <link rel="icon" href={withBase('favicon.svg')} type="image/svg+xml" />
     <link rel="icon" href={withBase('favicon-32.png')} sizes="32x32" type="image/png" />
