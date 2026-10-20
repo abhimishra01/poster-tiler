@@ -356,9 +356,21 @@ const { preset = null } = Astro.props;
     try { return await createImageBitmap(blob, { imageOrientation: 'from-image' }); } catch { return createImageBitmap(blob); }
   }
 
+  // A file that cannot be read must not leave the old picture active: a PDF of the old picture would be a mistake.
+  function clearSource(message: string) {
+    if (src) URL.revokeObjectURL(src.url);
+    src = null; current = null; tips = [];
+    $('img-name').textContent = message;
+    $('preview-inner').innerHTML = ''; $('crop-svg').innerHTML = '';
+    ['st-sheets', 'st-size', 'st-quality', 'bar-sheets', 'bar-size'].forEach((id) => { $(id).textContent = '-'; });
+    $('summary').textContent = 'Choose an image to see the poster.';
+    (all('.dl-btn') as HTMLButtonElement[]).forEach((b) => { b.disabled = true; b.textContent = dlText(b); });
+    (all('.test-btn') as HTMLButtonElement[]).forEach((b) => { b.disabled = true; });
+  }
+
   async function setSource(blob: Blob, name: string, sample = false) {
     if (blob.type === 'image/svg+xml' || (blob.type && !blob.type.startsWith('image/'))) {
-      $('img-name').textContent = 'Use a JPG, PNG or WebP image.';
+      clearSource('Use a JPG, PNG or WebP image. The earlier picture was removed.');
       return;
     }
     try {
@@ -373,7 +385,7 @@ const { preset = null } = Astro.props;
         : `${name}, ${w} × ${h} pixels. It stays on your device.`;
       update();
     } catch {
-      $('img-name').textContent = 'This browser cannot open that file. Try a JPG or PNG image.';
+      clearSource('This browser cannot open that file. Try a JPG or PNG image. The earlier picture was removed.');
     }
   }
 
