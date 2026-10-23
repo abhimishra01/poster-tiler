@@ -26,5 +26,5 @@ export default {
   locale: 'en-US',                    // BCP 47 language tag
   ogImage: '/og.png',                        // e.g. '/og.png' (1200x630 file in public/). Empty = no image
   category: 'UtilitiesApplication',   // schema.org applicationCategory
-  owner: bingemind ? 'Bingemind' : 'Print Large Poster',                // name used in legal pages (person or business)
+  owner: bingemind ? 'Bingemind (Abhishek Mishra)' : 'Print Large Poster',                // name used in legal pages (person or business)
 };
